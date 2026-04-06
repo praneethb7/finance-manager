@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/praneethbudati/Desktop/**)",
+      "Bash(npx create-expo-app@latest expense-tracker --template blank-typescript)",
+      "Bash(mv expense-tracker/.claude expense-tracker-claude-backup)",
+      "Bash(rm -rf expense-tracker)",
+      "Bash(*)",
+      "npm(*)",
+      "npx(*)"
+    ]
+  }
+}
+
