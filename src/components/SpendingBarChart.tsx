@@ -50,19 +50,19 @@ export default function SpendingBarChart({ data, maxValue = 1000, spent, budget,
               const h1 = Math.max((bar.value1 / maxValue) * chartHeight, 8);
               const h2 = Math.max((bar.value2 / maxValue) * chartHeight, 8);
               return (
-                <View key={i} style={styles.barGroup}>
-                  {/* Dark bar with vertical line texture */}
-                  <View style={[styles.bar, styles.darkBar, { height: h2 }]}>
+                <View key={i} style={[styles.barGroup, { height: Math.max(h1, h2) }]}>
+                  {/* Dark bar behind gradient bar */}
+                  <View style={[styles.bar, styles.darkBar, { height: h2, position: 'absolute', left: 0, bottom: 0 }]}>
                     {[0, 1, 2, 3, 4].map((j) => (
                       <View key={j} style={styles.barLine} />
                     ))}
                   </View>
-                  {/* Gradient bar: peach top → teal bottom */}
+                  {/* Gradient bar: peach top → teal bottom, overlapping */}
                   <LinearGradient
                     colors={['#F6D2B3', '#3FB9A2']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
-                    style={[styles.bar, { height: h1 }]}
+                    style={[styles.bar, { height: h1, position: 'absolute', left: 4, bottom: 0 }]}
                   />
                 </View>
               );
@@ -122,12 +122,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   barGroup: {
-    flexDirection: 'row',
+    position: 'relative',
+    width: 28,
     alignItems: 'flex-end',
-    gap: 3,
   },
   bar: {
-    width: 16,
+    width: 18,
     borderRadius: 4,
     overflow: 'hidden',
   },
@@ -163,10 +163,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     fontStyle: 'italic',
-    color: '#3B2C6E',
+    color: '#6B8A7A',
   },
   footerSlash: {
     fontSize: 13,
-    color: '#3B2C6E',
+    color: '#6B8A7A',
   },
 });

@@ -1,632 +1,431 @@
-import React, { useMemo } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Dimensions,
+  Platform,
+  Animated,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import Svg, { Path, Circle } from 'react-native-svg';
-import { useTheme } from '../context/ThemeContext';
+import Svg, { Path, G, Defs, ClipPath, Rect } from 'react-native-svg';
 import { useAuth } from '../context/AuthContext';
-import { useTransactions } from '../context/TransactionContext';
-import { DEFAULT_CATEGORIES } from '../constants/categories';
-import SpendingBarChart from '../components/SpendingBarChart';
 
-const { width } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-function MiniDonutChart({
-  segments,
-  size = 56,
+function LogoIcon({
+  size = 24,
+  color = '#FFFFFF',
 }: {
-  segments: { color: string; fraction: number }[];
   size?: number;
+  color?: string;
 }) {
-  const cx = size / 2;
-  const cy = size / 2;
-  const r = size / 2 - 6;
-  const strokeW = 6;
-
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const pt = (angle: number) => ({
-    x: cx + r * Math.cos(toRad(angle)),
-    y: cy + r * Math.sin(toRad(angle)),
-  });
-
-  const gap = 4;
-  let angle = -90;
-
   return (
-    <Svg width={size} height={size}>
-      {segments.map((seg, i) => {
-        const sweep = 360 * seg.fraction - gap;
-        if (sweep <= 0) return null;
-        const start = angle;
-        const end = angle + sweep;
-        angle = end + gap;
-        const p1 = pt(start);
-        const p2 = pt(end);
-        const large = sweep > 180 ? 1 : 0;
-        return (
-          <Path
-            key={i}
-            d={`M ${p1.x} ${p1.y} A ${r} ${r} 0 ${large} 1 ${p2.x} ${p2.y}`}
-            stroke={seg.color}
-            strokeWidth={strokeW}
-            strokeLinecap="round"
-            fill="none"
-          />
-        );
-      })}
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Defs>
+        <ClipPath id="logoClip">
+          <Rect width="24" height="24" fill="white" />
+        </ClipPath>
+      </Defs>
+      <G clipPath="url(#logoClip)">
+        <Path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M15.3334 7.01118C14.3467 6.3519 13.1867 6 12 6V0C14.3734 0 16.6934 0.703788 18.6668 2.02237C20.6402 3.34094 22.1783 5.21509 23.0866 7.40778C23.9948 9.60048 24.2324 12.0133 23.7694 14.3411C23.3064 16.6688 22.1635 18.8071 20.4853 20.4853C18.8071 22.1635 16.6688 23.3064 14.3411 23.7694C12.0133 24.2324 9.60048 23.9948 7.40778 23.0866C5.21509 22.1783 3.34094 20.6402 2.02237 18.6668C0.703788 16.6934 0 14.3734 0 12H6C6 13.1867 6.3519 14.3467 7.01118 15.3334C7.67046 16.3201 8.60754 17.0891 9.70392 17.5433C10.8002 17.9974 12.0067 18.1162 13.1705 17.8847C14.3344 17.6532 15.4035 17.0818 16.2427 16.2427C17.0818 15.4035 17.6532 14.3344 17.8847 13.1705C18.1162 12.0067 17.9974 10.8002 17.5433 9.70392C17.0891 8.60754 16.3201 7.67046 15.3334 7.01118Z"
+          fill={color}
+        />
+        <Path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M6 2.59875e-06C6 0.787934 5.84481 1.56815 5.54328 2.2961C5.24175 3.02406 4.79979 3.68549 4.24264 4.24264C3.68549 4.7998 3.02406 5.24175 2.2961 5.54328C1.56814 5.84481 0.787929 6 2.62266e-07 6L0 12C1.57586 12 3.13629 11.6896 4.5922 11.0866C6.04812 10.4835 7.371 9.59958 8.48526 8.48526C9.59958 7.371 10.4835 6.04812 11.0866 4.5922C11.6896 3.13629 12 1.57586 12 0L6 2.59875e-06Z"
+          fill={color}
+        />
+      </G>
     </Svg>
   );
 }
 
-export default function HomeScreen() {
-  const { colors } = useTheme();
-  const { user } = useAuth();
-  const { transactions, getMonthlyStats } = useTransactions();
-
-  const now = new Date();
-  const stats = getMonthlyStats(now.getMonth(), now.getFullYear());
-
-  const firstName = user?.name?.split(' ')[0] || 'there';
-
-  // Get this week's transactions
-  const weekStart = new Date();
-  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-  weekStart.setHours(0, 0, 0, 0);
-
-  const weeklyExpenses = useMemo(
-    () =>
-      transactions
-        .filter(
-          (t) => t.type === 'expense' && new Date(t.date) >= weekStart
-        )
-        .reduce((s, t) => s + t.amount, 0),
-    [transactions]
+function ExpenseRow({
+  title,
+  subtitle,
+  amount,
+  highlighted = false,
+}: {
+  title: string;
+  subtitle: string;
+  amount: string;
+  highlighted?: boolean;
+}) {
+  const inner = (
+    <View style={styles.expenseInner}>
+      <View style={styles.expenseIconWrap}>
+        <LogoIcon size={26} color="#FFFFFF" />
+      </View>
+      <View style={styles.expenseTextWrap}>
+        <Text style={styles.expenseTitle}>{title}</Text>
+        <Text
+          style={[
+            styles.expenseSubtitle,
+            highlighted && styles.expenseSubtitleHighlighted,
+          ]}
+        >
+          {subtitle}
+        </Text>
+      </View>
+      <MaterialCommunityIcons
+        name="star-outline"
+        size={22}
+        color="#3D3D3D"
+        style={styles.starIcon}
+      />
+      <View
+        style={[
+          styles.amountBadge,
+          highlighted && styles.amountBadgeHighlighted,
+        ]}
+      >
+        <Text style={styles.amountText}>{amount}</Text>
+      </View>
+    </View>
   );
 
-  // Spending by category for this month
-  const categorySpending = useMemo(() => {
-    const monthTxns = transactions.filter((t) => {
-      const d = new Date(t.date);
-      return (
-        t.type === 'expense' &&
-        d.getMonth() === now.getMonth() &&
-        d.getFullYear() === now.getFullYear()
-      );
-    });
-    const map: Record<string, number> = {};
-    monthTxns.forEach((t) => {
-      map[t.categoryId] = (map[t.categoryId] || 0) + t.amount;
-    });
-    return Object.entries(map)
-      .map(([id, amount]) => ({
-        category: DEFAULT_CATEGORIES.find((c) => c.id === id),
-        amount,
-      }))
-      .filter((c) => c.category)
-      .sort((a, b) => b.amount - a.amount);
-  }, [transactions]);
+  return (
+    <LinearGradient
+      colors={
+        highlighted
+          ? ['#192D29', '#262626', '#0A0A0A']
+          : ['#262626', '#0A0A0A']
+      }
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[
+        styles.expenseRow,
+        highlighted ? styles.expenseRowHighlighted : styles.expenseRowDefault,
+      ]}
+    >
+      {inner}
+    </LinearGradient>
+  );
+}
 
-  // Top 2 expense categories
-  const topCategories = categorySpending.slice(0, 2);
+export default function HomeScreen() {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<'weekly' | 'monthly'>('weekly');
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
-  // Weekly bar chart data (last 7 days)
-  const barData = useMemo(() => {
-    const days: { value1: number; value2: number }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      date.setHours(0, 0, 0, 0);
-      const nextDay = new Date(date);
-      nextDay.setDate(nextDay.getDate() + 1);
+  const firstName = user?.name?.split(' ')[0] || 'Alex';
 
-      const dayExpenses = transactions
-        .filter(
-          (t) =>
-            t.type === 'expense' &&
-            new Date(t.date) >= date &&
-            new Date(t.date) < nextDay
-        )
-        .reduce((s, t) => s + t.amount, 0);
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: activeTab === 'weekly' ? 0 : 1,
+      useNativeDriver: false,
+      friction: 8,
+      tension: 60,
+    }).start();
+  }, [activeTab]);
 
-      const dayIncome = transactions
-        .filter(
-          (t) =>
-            t.type === 'income' &&
-            new Date(t.date) >= date &&
-            new Date(t.date) < nextDay
-        )
-        .reduce((s, t) => s + t.amount, 0);
-
-      days.push({ value1: dayExpenses, value2: dayIncome });
-    }
-    return days;
-  }, [transactions]);
-
-  const weeklyBudget = 1000;
-  const weeklyProgress = Math.min(weeklyExpenses / weeklyBudget, 1);
+  const cardWidth = SCREEN_WIDTH - 80;
+  const cardHeight = cardWidth / 1.586;
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      edges={['top']}
-    >
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View
-            style={[styles.avatar, { backgroundColor: colors.text }]}
-          >
-            <Text style={[styles.avatarText, { color: colors.background }]}>
-              {(user?.name?.[0] || 'P').toUpperCase()}
-              {(user?.name?.split(' ')[1]?.[0] || 'U').toUpperCase()}
-            </Text>
-          </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.headerIcon}>
-              <MaterialCommunityIcons
-                name="magnify"
-                size={22}
-                color={colors.text}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerIcon}>
-              <MaterialCommunityIcons
-                name="bell-outline"
-                size={22}
-                color={colors.text}
-              />
-              <View style={styles.notifBadge}>
-                <Text style={styles.notifBadgeText}>2</Text>
+    <View style={styles.root}>
+      <View style={styles.safe}>
+        {/* Content - flex fills remaining space */}
+        <View style={styles.content}>
+          {/* Greeting */}
+          <Text style={styles.greeting}>Hey, {firstName}</Text>
+          <Text style={styles.greetingSub}>Add your yesterday's expense</Text>
+
+          {/* Card */}
+          <View style={styles.cardWrapper}>
+            <LinearGradient
+              colors={['#D4A574', '#A8D4B8', '#6ECFB5']}
+              start={{ x: 0.0, y: 0.0 }}
+              end={{ x: 1.0, y: 1.0 }}
+              style={[styles.card, { width: cardWidth, height: cardHeight }]}
+            >
+              <View style={styles.cardTop}>
+                <Text style={styles.cardBankName}>ADRBank</Text>
+                <View style={styles.cardLogoCircle}>
+                  <LogoIcon size={20} color="#FFFFFF" />
+                </View>
               </View>
+              <Text style={styles.cardNumber}>8763 1111 2222 0329</Text>
+              <View style={styles.cardBottom}>
+                <View>
+                  <Text style={styles.cardLabel}>Card Holder Name</Text>
+                  <Text style={styles.cardValue}>ALEX</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.cardLabel}>Expired Date</Text>
+                  <Text style={styles.cardValue}>10/28</Text>
+                </View>
+              </View>
+            </LinearGradient>
+          </View>
+
+          {/* Your expenses */}
+          <Text style={styles.sectionTitle}>Your expenses</Text>
+
+          {/* Toggle */}
+          <View style={styles.toggleWrap}>
+            <Animated.View
+              style={[
+                styles.toggleIndicator,
+                {
+                  left: slideAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0%', '50%'],
+                  }),
+                },
+              ]}
+            />
+            <TouchableOpacity
+              style={styles.toggleBtn}
+              onPress={() => setActiveTab('weekly')}
+              activeOpacity={0.85}
+            >
+              <Text
+                style={[
+                  styles.toggleText,
+                  activeTab === 'weekly' && styles.toggleTextActive,
+                ]}
+              >
+                Weekly
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.toggleBtn}
+              onPress={() => setActiveTab('monthly')}
+              activeOpacity={0.85}
+            >
+              <Text
+                style={[
+                  styles.toggleText,
+                  activeTab === 'monthly' && styles.toggleTextActive,
+                ]}
+              >
+                Monthly
+              </Text>
             </TouchableOpacity>
           </View>
+
+          {/* Expense rows */}
+          <View style={styles.expenseList}>
+            <ExpenseRow
+              title="FOOD"
+              subtitle="Lesser than last week"
+              amount="$1000"
+            />
+            <ExpenseRow
+              title="TRAVEL"
+              subtitle="More than last week"
+              amount="$4000"
+              highlighted
+            />
+          </View>
+
+          <View style={{ flex: 1 }} />
         </View>
-
-        {/* Greeting */}
-        <Text style={[styles.greeting, { color: colors.text }]}>
-          Hey, {firstName}
-        </Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Add yesterday's expenses, yesterday's expenses{'\n'}
-          are yesterday's, yesterday's expired
-        </Text>
-
-        {/* Hero Card */}
-        <LinearGradient
-          colors={['#FED4B4', '#3BB9A1']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.heroCard}
-        >
-          {/* Card top row */}
-          <View style={styles.cardHeader}>
-            <View style={styles.cardLogoRow}>
-              <MiniDonutChart
-                segments={[
-                  { color: '#FFFFFF', fraction: 0.35 },
-                  { color: 'rgba(255,255,255,0.4)', fraction: 0.25 },
-                  { color: 'rgba(255,255,255,0.6)', fraction: 0.22 },
-                  { color: 'rgba(255,255,255,0.8)', fraction: 0.18 },
-                ]}
-                size={40}
-              />
-              <Text style={styles.cardBankName}>ADRB Bank</Text>
-            </View>
-          </View>
-
-          {/* Balance */}
-          <View style={styles.cardBalance}>
-            <Text style={styles.cardBalanceLabel}>ALEX</Text>
-            <Text style={styles.cardBalanceAmount}>
-              ${stats.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </Text>
-          </View>
-
-          {/* Card numbers */}
-          <View style={styles.cardNumberRow}>
-            <Text style={styles.cardNumber}>8711</Text>
-            <Text style={styles.cardNumber}>1222</Text>
-            <Text style={styles.cardNumber}>2222</Text>
-          </View>
-
-          {/* Card bottom */}
-          <View style={styles.cardBottom}>
-            <View>
-              <Text style={styles.cardSmallLabel}>Card Holder Name</Text>
-              <Text style={styles.cardSmallValue}>
-                {user?.name || 'Alex'}
-              </Text>
-            </View>
-            <View>
-              <Text style={styles.cardSmallLabel}>Expired Date</Text>
-              <Text style={styles.cardSmallValue}>10/28</Text>
-            </View>
-          </View>
-        </LinearGradient>
-
-        {/* Your Expenses Section */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          Your expenses
-        </Text>
-
-        {/* Weekly / Monthly Toggle */}
-        <View
-          style={[styles.toggleContainer, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
-        >
-          <View style={[styles.toggleActive, { backgroundColor: '#FFFFFF' }]}>
-            <Text style={styles.toggleActiveText}>Weekly</Text>
-          </View>
-          <View style={styles.toggleInactive}>
-            <Text style={[styles.toggleInactiveText, { color: colors.textSecondary }]}>
-              Monthly
-            </Text>
-          </View>
-        </View>
-
-        {/* Spending Cards */}
-        {topCategories.length > 0 ? (
-          <View style={styles.expenseCardsRow}>
-            {topCategories.map((item, index) => {
-              const cat = item.category!;
-              const total = stats.expenses || 1;
-              const fraction = item.amount / total;
-              const otherFraction = 1 - fraction;
-
-              return (
-                <LinearGradient
-                  key={cat.id}
-                  colors={
-                    index === 0
-                      ? [colors.card, colors.background]
-                      : ['#192D29', colors.card, colors.background]
-                  }
-                  start={{ x: 0, y: 0.5 }}
-                  end={{ x: 1, y: 0.5 }}
-                  style={[
-                    styles.expenseCard,
-                    { borderColor: colors.cardBorder },
-                  ]}
-                >
-                  <View style={styles.expenseCardContent}>
-                    <View style={styles.expenseCardLeft}>
-                      {/* Stars */}
-                      <View style={styles.starsRow}>
-                        <MaterialCommunityIcons
-                          name="star"
-                          size={14}
-                          color={colors.textSecondary}
-                        />
-                        <Text
-                          style={[
-                            styles.ratingText,
-                            { color: colors.textSecondary },
-                          ]}
-                        >
-                          {(fraction * 5).toFixed(1)}
-                        </Text>
-                      </View>
-
-                      {/* Amount badge */}
-                      <View
-                        style={[
-                          styles.amountBadge,
-                          { backgroundColor: colors.card, borderColor: colors.cardBorder },
-                        ]}
-                      >
-                        <Text style={[styles.amountBadgeText, { color: colors.text }]}>
-                          ${item.amount.toLocaleString()}
-                        </Text>
-                      </View>
-
-                      {/* Category name */}
-                      <Text style={[styles.categoryTitle, { color: colors.text }]}>
-                        {cat.name.toUpperCase()}
-                      </Text>
-
-                      {/* Subtext */}
-                      <Text
-                        style={[
-                          styles.categorySubtext,
-                          { color: colors.textSecondary },
-                        ]}
-                      >
-                        Less than last week
-                      </Text>
-                    </View>
-
-                    <View style={styles.expenseCardRight}>
-                      <MiniDonutChart
-                        segments={[
-                          { color: cat.color, fraction },
-                          { color: colors.cardBorder, fraction: otherFraction },
-                        ]}
-                        size={56}
-                      />
-                    </View>
-                  </View>
-                </LinearGradient>
-              );
-            })}
-          </View>
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              No expenses yet this month.{'\n'}Tap + to add your first transaction.
-            </Text>
-          </View>
-        )}
-
-        {/* Bar Chart */}
-        <SpendingBarChart
-          data={barData}
-          maxValue={Math.max(weeklyBudget, weeklyExpenses, 100)}
-          spent={weeklyExpenses}
-          budget={weeklyBudget}
-          title="Weekly spending"
-        />
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
-
-      {/* FAB */}
-      <TouchableOpacity style={styles.fab} activeOpacity={0.8}>
-        <MaterialCommunityIcons name="plus" size={28} color="#171717" />
-      </TouchableOpacity>
-    </SafeAreaView>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
+    backgroundColor: '#0A0A0A',
   },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
+  safe: {
+    flex: 1,
+    backgroundColor: '#0A0A0A',
   },
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
+
+  // Content
+  content: {
+    flex: 1,
+    paddingHorizontal: 18,
+    paddingTop: 18,
   },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  headerIcon: {
-    position: 'relative',
-  },
-  notifBadge: {
-    position: 'absolute',
-    top: -6,
-    right: -8,
-    backgroundColor: '#D53436',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  notifBadgeText: {
-    color: '#171717',
-    fontSize: 11,
-    fontWeight: '700',
-  },
+
   // Greeting
   greeting: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
-  subtitle: {
-    fontSize: 13,
-    lineHeight: 18,
+  greetingSub: {
+    fontSize: 14,
+    color: '#888888',
     marginBottom: 20,
   },
-  // Hero Card
-  heroCard: {
-    borderRadius: 16,
-    padding: 20,
+
+  // Card
+  cardWrapper: {
+    alignItems: 'center',
     marginBottom: 24,
-    overflow: 'hidden',
   },
-  cardHeader: {
+  card: {
+    borderRadius: 20,
+    paddingHorizontal: 22,
+    paddingTop: 18,
+    paddingBottom: 20,
+    justifyContent: 'space-between',
+  },
+  cardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  cardLogoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    alignItems: 'flex-start',
   },
   cardBankName: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
-  cardBalance: {
-    marginBottom: 12,
-  },
-  cardBalanceLabel: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.7)',
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  cardBalanceAmount: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
-  },
-  cardNumberRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
+  cardLogoCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cardNumber: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.6)',
-    fontWeight: '500',
-    letterSpacing: 2,
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 3,
   },
   cardBottom: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-end',
   },
-  cardSmallLabel: {
-    fontSize: 9,
-    color: 'rgba(255,255,255,0.5)',
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    marginBottom: 2,
+  cardLabel: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.65)',
+    marginBottom: 3,
+    letterSpacing: 0.2,
   },
-  cardSmallValue: {
-    fontSize: 12,
+  cardValue: {
+    fontSize: 14,
+    fontWeight: '700',
     color: '#FFFFFF',
-    fontWeight: '600',
+    letterSpacing: 0.8,
   },
+
   // Section
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
+    color: '#FFFFFF',
     marginBottom: 12,
   },
+
   // Toggle
-  toggleContainer: {
+  toggleWrap: {
     flexDirection: 'row',
-    borderRadius: 14,
-    padding: 3,
-    marginBottom: 16,
-    borderWidth: 0.5,
+    backgroundColor: '#1C1C1C',
+    borderRadius: 50,
+    padding: 4,
+    marginBottom: 14,
+    position: 'relative',
   },
-  toggleActive: {
-    flex: 1,
-    borderRadius: 12,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  toggleActiveText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#171717',
-  },
-  toggleInactive: {
-    flex: 1,
-    borderRadius: 12,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  toggleInactiveText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  // Expense Cards
-  expenseCardsRow: {
-    gap: 12,
-    marginBottom: 20,
-  },
-  expenseCard: {
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 0.5,
-    overflow: 'hidden',
-  },
-  expenseCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  expenseCardLeft: {
-    flex: 1,
-  },
-  expenseCardRight: {
-    marginLeft: 12,
-  },
-  starsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 8,
-  },
-  ratingText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  amountBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 0.5,
-    marginBottom: 10,
-  },
-  amountBadgeText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  categoryTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  categorySubtext: {
-    fontSize: 11,
-  },
-  // Empty
-  emptyState: {
-    paddingVertical: 32,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  // FAB
-  fab: {
+  toggleIndicator: {
     position: 'absolute',
-    bottom: 24,
-    right: 16,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#FAFAFA',
+    top: 4,
+    bottom: 4,
+    width: '50%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 50,
+  },
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: 5,
+    borderRadius: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    zIndex: 1,
   },
+  toggleText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#666666',
+  },
+  toggleTextActive: {
+    color: '#111111',
+    fontWeight: '600',
+  },
+
+  // Expense List
+  expenseList: {
+    gap: 10,
+  },
+  expenseRow: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  expenseRowDefault: {
+    borderWidth: 0.53,
+    borderColor: '#262626',
+  },
+  expenseRowHighlighted: {
+    borderWidth: 0.53,
+    borderColor: '#262626',
+  },
+  expenseInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  expenseIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 13,
+  },
+  expenseTextWrap: {
+    flex: 1,
+  },
+  expenseTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.8,
+    marginBottom: 3,
+  },
+  expenseSubtitle: {
+    fontSize: 12,
+    color: '#888888',
+  },
+  expenseSubtitleHighlighted: {
+    color: '#6BADA0',
+  },
+  starIcon: {
+    marginRight: 12,
+  },
+  amountBadge: {
+    backgroundColor: '#252525',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  amountBadgeHighlighted: {
+    backgroundColor: '#1A302C',
+  },
+  amountText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
 });

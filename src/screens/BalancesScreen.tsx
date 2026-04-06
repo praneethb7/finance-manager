@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
@@ -35,28 +34,7 @@ export default function BalancesScreen() {
   }, [stats]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Top Bar */}
-      <View style={styles.topBar}>
-        <View style={styles.topBarLeft}>
-          <View style={styles.logoSmall}>
-            <Text style={styles.logoSmallText}>P</Text>
-          </View>
-          <Text style={[styles.appName, { color: colors.text }]}>PayU</Text>
-        </View>
-        <View style={styles.topBarRight}>
-          <TouchableOpacity style={styles.iconButton}>
-            <MaterialCommunityIcons name="magnify" size={22} color={colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}>
-            <MaterialCommunityIcons name="bell-outline" size={22} color={colors.text} />
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>2</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-      </View>
-
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -75,29 +53,34 @@ export default function BalancesScreen() {
         </Text>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Available Currencies</Text>
-        <LinearGradient
-          colors={['#262626', '#0A0A0A']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.currencyCard}
-        >
-          <View style={styles.currencyLeft}>
-            <Text style={styles.flag}>🇨🇦</Text>
-            <View>
-              <Text style={[styles.currencyCode, { color: colors.text }]}>CAD</Text>
-              <Text style={[styles.currencyName, { color: colors.textSecondary }]}>Canadian Dollar</Text>
+        <View style={styles.currencyCardOuter}>
+          <LinearGradient
+            colors={['#262626', '#0A0A0A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.currencyCard}
+          >
+            {/* Inner shadow overlays */}
+            <View style={styles.innerShadowLight} pointerEvents="none" />
+            <View style={styles.innerShadowDark} pointerEvents="none" />
+            <View style={styles.currencyLeft}>
+              <Text style={styles.flag}>🇨🇦</Text>
+              <View>
+                <Text style={[styles.currencyCode, { color: colors.text }]}>CAD</Text>
+                <Text style={[styles.currencyName, { color: colors.textSecondary }]}>Canadian Dollar</Text>
+              </View>
             </View>
-          </View>
-          <View style={styles.currencyRight}>
-            <TouchableOpacity>
-              <MaterialCommunityIcons name="star-outline" size={20} color={colors.textTertiary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.enableButton, { borderColor: 'rgba(255,255,255,0.15)' }]}>
-              <MaterialCommunityIcons name="plus" size={14} color={colors.text} />
-              <Text style={[styles.enableText, { color: colors.text }]}>Enable</Text>
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
+            <View style={styles.currencyRight}>
+              <TouchableOpacity>
+                <MaterialCommunityIcons name="star-outline" size={20} color={colors.textTertiary} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.enableButton, { borderColor: 'rgba(255,255,255,0.15)' }]}>
+                <MaterialCommunityIcons name="plus" size={14} color={colors.text} />
+                <Text style={[styles.enableText, { color: colors.text }]}>Enable</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+        </View>
 
         <SpendingBarChart
           data={barData}
@@ -110,71 +93,13 @@ export default function BalancesScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* FAB */}
-      <TouchableOpacity style={[styles.fab, { backgroundColor: colors.text }]}>
-        <MaterialCommunityIcons name="plus" size={28} color={colors.background} />
-      </TouchableOpacity>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  topBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  logoSmall: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoSmallText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#000',
-  },
-  appName: {
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  topBarRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  iconButton: {
-    position: 'relative',
-  },
-  badge: {
-    position: 'absolute',
-    top: -5,
-    right: -7,
-    backgroundColor: '#FF3B30',
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    color: '#FFF',
-    fontSize: 9,
-    fontWeight: '700',
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -206,21 +131,50 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 10,
   },
+  currencyCardOuter: {
+    marginBottom: 20,
+    borderRadius: 14,
+    shadowColor: '#FAFAFA',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 7,
+    elevation: 2,
+  },
   currencyCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderRadius: 14,
-    borderWidth: 0.5,
+    borderWidth: 0.53,
     borderColor: '#262626',
     paddingHorizontal: 16,
-    paddingVertical: 18,
-    marginBottom: 20,
+    paddingVertical: 16,
+    height: 85,
+    overflow: 'hidden',
+  },
+  innerShadowLight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 14,
     shadowColor: '#FAFAFA',
-    shadowOffset: { width: 1, height: 1 },
-    shadowOpacity: 0.06,
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.15,
     shadowRadius: 7,
-    elevation: 2,
+  },
+  innerShadowDark: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 14,
+    shadowColor: '#000000',
+    shadowOffset: { width: -2, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 7,
   },
   currencyLeft: {
     flexDirection: 'row',
@@ -254,20 +208,5 @@ const styles = StyleSheet.create({
   enableText: {
     fontSize: 12,
     fontWeight: '600',
-  },
-  fab: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 24 : 16,
-    right: 20,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
 });

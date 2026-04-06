@@ -102,8 +102,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scoreText: {
-    fontSize: 52,
-    fontWeight: '800',
-    letterSpacing: -1,
+    fontSize: 56,
+    fontWeight: '900',
+    letterSpacing: -2,
   },
 });
