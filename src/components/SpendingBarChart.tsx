@@ -10,16 +10,27 @@ interface BarData {
 
 interface Props {
   data: BarData[];
-  maxValue?: number;
   spent: number;
   budget: number;
   title: string;
 }
 
-export default function SpendingBarChart({ data, maxValue = 1000, spent, budget, title }: Props) {
-  const { colors } = useTheme();
-  const yLabels = ['$1000', '$500', '$200', '$0'];
+export default function SpendingBarChart({ data, spent, budget, title }: Props) {
+  const { mode, colors } = useTheme();
+  const isDark = mode === 'dark';
   const chartHeight = 130;
+
+  // Compute max from actual data, with a sensible minimum
+  const dataMax = Math.max(...data.map((b) => Math.max(b.value1, b.value2)), 1);
+  const maxValue = Math.ceil(dataMax / 100) * 100 || 100; // round up to nearest 100
+
+  // Dynamic y-axis labels: top, 2/3, 1/3, 0
+  const yLabels = [
+    `₹${maxValue}`,
+    `₹${Math.round((maxValue * 2) / 3)}`,
+    `₹${Math.round(maxValue / 3)}`,
+    '₹0',
+  ];
 
   return (
     <View style={styles.container}>
@@ -27,7 +38,7 @@ export default function SpendingBarChart({ data, maxValue = 1000, spent, budget,
         {/* Y labels */}
         <View style={styles.yAxis}>
           {yLabels.map((label, i) => (
-            <Text key={i} style={styles.yLabel}>{label}</Text>
+            <Text key={i} style={[styles.yLabel, { color: isDark ? '#464646' : '#999999' }]}>{label}</Text>
           ))}
         </View>
 
@@ -39,7 +50,10 @@ export default function SpendingBarChart({ data, maxValue = 1000, spent, budget,
               key={i}
               style={[
                 styles.gridLine,
-                { top: (i / (yLabels.length - 1)) * chartHeight },
+                {
+                  top: (i / (yLabels.length - 1)) * chartHeight,
+                  borderColor: isDark ? 'rgba(204,204,204,0.4)' : 'rgba(0,0,0,0.1)',
+                },
               ]}
             />
           ))}
@@ -52,9 +66,9 @@ export default function SpendingBarChart({ data, maxValue = 1000, spent, budget,
               return (
                 <View key={i} style={[styles.barGroup, { height: Math.max(h1, h2) }]}>
                   {/* Dark bar behind gradient bar */}
-                  <View style={[styles.bar, styles.darkBar, { height: h2, position: 'absolute', left: 0, bottom: 0 }]}>
+                  <View style={[styles.bar, styles.darkBar, { height: h2, position: 'absolute', left: 0, bottom: 0, backgroundColor: isDark ? '#262626' : '#E0E0E0' }]}>
                     {[0, 1, 2, 3, 4].map((j) => (
-                      <View key={j} style={styles.barLine} />
+                      <View key={j} style={[styles.barLine, { backgroundColor: isDark ? '#262626' : '#E0E0E0', borderRightColor: isDark ? '#333' : '#CCC' }]} />
                     ))}
                   </View>
                   {/* Gradient bar: peach top → teal bottom, overlapping */}
@@ -73,11 +87,11 @@ export default function SpendingBarChart({ data, maxValue = 1000, spent, budget,
 
       {/* Footer */}
       <View style={styles.footer}>
-        <Text style={styles.footerTitle}>{title}</Text>
+        <Text style={[styles.footerTitle, { color: isDark ? '#7A7A7A' : '#999999' }]}>{title}</Text>
         <View style={styles.footerValues}>
-          <Text style={styles.footerAmount}>${spent.toFixed(2)}</Text>
-          <Text style={styles.footerSlash}> / </Text>
-          <Text style={styles.footerAmount}>${budget.toFixed(2)}</Text>
+          <Text style={[styles.footerAmount, { color: isDark ? '#6B8A7A' : '#4A7A6A' }]}>₹{spent.toFixed(2)}</Text>
+          <Text style={[styles.footerSlash, { color: isDark ? '#6B8A7A' : '#4A7A6A' }]}> / </Text>
+          <Text style={[styles.footerAmount, { color: isDark ? '#6B8A7A' : '#4A7A6A' }]}>₹{budget.toFixed(2)}</Text>
         </View>
       </View>
     </View>
@@ -100,7 +114,6 @@ const styles = StyleSheet.create({
   yLabel: {
     fontSize: 10,
     textAlign: 'right',
-    color: '#464646',
   },
   chartBody: {
     flex: 1,
@@ -111,7 +124,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     borderTopWidth: 0.5,
-    borderColor: 'rgba(204,204,204,0.4)',
     borderStyle: 'dashed',
   },
   barsContainer: {
@@ -132,16 +144,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   darkBar: {
-    backgroundColor: '#262626',
     flexDirection: 'row',
     justifyContent: 'space-evenly',
   },
   barLine: {
     width: 1,
     height: '100%',
-    backgroundColor: '#262626',
     borderRightWidth: 0.5,
-    borderRightColor: '#333',
   },
   footer: {
     flexDirection: 'row',
@@ -153,7 +162,6 @@ const styles = StyleSheet.create({
   footerTitle: {
     fontSize: 11,
     fontStyle: 'italic',
-    color: '#7A7A7A',
   },
   footerValues: {
     flexDirection: 'row',
@@ -163,10 +171,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     fontStyle: 'italic',
-    color: '#6B8A7A',
   },
   footerSlash: {
     fontSize: 13,
-    color: '#6B8A7A',
   },
 });

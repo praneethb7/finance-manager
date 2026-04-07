@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from './AuthContext';
 
 export interface Transaction {
   id: string;
@@ -29,19 +30,28 @@ const TransactionContext = createContext<TransactionContextType>({
 
 export const useTransactions = () => useContext(TransactionContext);
 
-const STORAGE_KEY = 'transactions';
+function getStorageKey(userId: string) {
+  return `transactions_${userId}`;
+}
 
 export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
+  // Load transactions for the current user; reset when user changes
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((saved) => {
-      if (saved) setTransactions(JSON.parse(saved));
+    if (!user) {
+      setTransactions([]);
+      return;
+    }
+    AsyncStorage.getItem(getStorageKey(user.id)).then((saved) => {
+      setTransactions(saved ? JSON.parse(saved) : []);
     });
-  }, []);
+  }, [user?.id]);
 
   const persist = (txns: Transaction[]) => {
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(txns));
+    if (!user) return;
+    AsyncStorage.setItem(getStorageKey(user.id), JSON.stringify(txns));
   };
 
   const addTransaction = useCallback((t: Omit<Transaction, 'id' | 'createdAt'>) => {
@@ -55,7 +65,7 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       persist(updated);
       return updated;
     });
-  }, []);
+  }, [user?.id]);
 
   const deleteTransaction = useCallback((id: string) => {
     setTransactions((prev) => {
@@ -63,7 +73,7 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       persist(updated);
       return updated;
     });
-  }, []);
+  }, [user?.id]);
 
   const editTransaction = useCallback((id: string, changes: Partial<Transaction>) => {
     setTransactions((prev) => {
@@ -71,7 +81,7 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       persist(updated);
       return updated;
     });
-  }, []);
+  }, [user?.id]);
 
   const getMonthlyStats = useCallback(
     (month: number, year: number) => {

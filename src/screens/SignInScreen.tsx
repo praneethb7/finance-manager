@@ -75,8 +75,8 @@ export default function SignInScreen() {
       } else {
         await signUp(name, email, password);
       }
-    } catch {
-      setErrors({ general: 'Something went wrong' });
+    } catch (err: any) {
+      setErrors({ general: err?.message || 'Something went wrong' });
     } finally {
       setLoading(false);
     }
@@ -322,8 +322,8 @@ const styles = StyleSheet.create({
   },
   tabPill: {
     position: 'absolute',
-    top: 3,
-    bottom: 3,
+    top: 7,
+    bottom: 7,
     width: '48%',
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
@@ -378,8 +378,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   submitButton: {
-    borderRadius: 22,
-    paddingVertical: 11,
+    borderRadius: 12,
+    paddingVertical: 9,
     alignItems: 'center',
     marginTop: 16,
   },

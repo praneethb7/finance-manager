@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,18 @@ import {
   Dimensions,
   Platform,
   Animated,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Path, G, Defs, ClipPath, Rect } from 'react-native-svg';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { useTransactions } from '../context/TransactionContext';
+import { DEFAULT_CATEGORIES } from '../constants/categories';
+import { formatCurrency } from '../utils/formatters';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 function LogoIcon({
   size = 24,
@@ -52,19 +57,27 @@ function ExpenseRow({
   subtitle,
   amount,
   highlighted = false,
+  iconName,
+  isDark,
 }: {
   title: string;
   subtitle: string;
   amount: string;
   highlighted?: boolean;
+  iconName?: string;
+  isDark: boolean;
 }) {
   const inner = (
     <View style={styles.expenseInner}>
-      <View style={styles.expenseIconWrap}>
-        <LogoIcon size={26} color="#FFFFFF" />
+      <View style={[styles.expenseIconWrap, { backgroundColor: isDark ? '#2C2C2E' : '#E5E5EA' }]}>
+        {iconName ? (
+          <MaterialCommunityIcons name={iconName as any} size={26} color={isDark ? '#FFFFFF' : '#3A3A3C'} />
+        ) : (
+          <LogoIcon size={26} color={isDark ? '#FFFFFF' : '#3A3A3C'} />
+        )}
       </View>
       <View style={styles.expenseTextWrap}>
-        <Text style={styles.expenseTitle}>{title}</Text>
+        <Text style={[styles.expenseTitle, !isDark && { color: '#111111' }]}>{title}</Text>
         <Text
           style={[
             styles.expenseSubtitle,
@@ -77,43 +90,68 @@ function ExpenseRow({
       <MaterialCommunityIcons
         name="star-outline"
         size={22}
-        color="#3D3D3D"
+        color={isDark ? '#3D3D3D' : '#CCCCCC'}
         style={styles.starIcon}
       />
       <View
         style={[
           styles.amountBadge,
-          highlighted && styles.amountBadgeHighlighted,
+          !isDark && { backgroundColor: '#F0F0F0' },
+          highlighted && (isDark ? styles.amountBadgeHighlighted : { backgroundColor: '#E8F5E9' }),
         ]}
       >
-        <Text style={styles.amountText}>{amount}</Text>
+        <Text style={[styles.amountText, !isDark && { color: '#111111' }]}>{amount}</Text>
       </View>
     </View>
   );
 
+  if (isDark) {
+    return (
+      <View style={styles.expenseRowOuter}>
+        <LinearGradient
+          colors={
+            highlighted
+              ? ['#192D29', '#262626', '#0A0A0A']
+              : ['#262626', '#0A0A0A']
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[
+            styles.expenseRow,
+            highlighted ? styles.expenseRowHighlighted : styles.expenseRowDefault,
+          ]}
+        >
+          <View style={styles.expenseInnerShadowLight} pointerEvents="none" />
+          <View style={styles.expenseInnerShadowDark} pointerEvents="none" />
+          {inner}
+        </LinearGradient>
+      </View>
+    );
+  }
+
   return (
-    <LinearGradient
-      colors={
-        highlighted
-          ? ['#192D29', '#262626', '#0A0A0A']
-          : ['#262626', '#0A0A0A']
-      }
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+    <View
       style={[
         styles.expenseRow,
-        highlighted ? styles.expenseRowHighlighted : styles.expenseRowDefault,
+        {
+          backgroundColor: '#FFFFFF',
+          borderWidth: 1,
+          borderColor: highlighted ? '#C8E6C9' : '#E5E5EA',
+        },
       ]}
     >
       {inner}
-    </LinearGradient>
+    </View>
   );
 }
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  const { mode, colors } = useTheme();
+  const { transactions, getMonthlyStats } = useTransactions();
   const [activeTab, setActiveTab] = useState<'weekly' | 'monthly'>('weekly');
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const isDark = mode === 'dark';
 
   const firstName = user?.name?.split(' ')[0] || 'Alex';
 
@@ -126,110 +164,140 @@ export default function HomeScreen() {
     }).start();
   }, [activeTab]);
 
+  const topExpenses = useMemo(() => {
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const cutoff = activeTab === 'weekly' ? startOfWeek : startOfMonth;
+
+    const expenseTxns = transactions.filter(
+      (t) => t.type === 'expense' && new Date(t.date) >= cutoff
+    );
+
+    const byCategory: Record<string, number> = {};
+    for (const t of expenseTxns) {
+      byCategory[t.categoryId] = (byCategory[t.categoryId] || 0) + t.amount;
+    }
+
+    return Object.entries(byCategory)
+      .sort((a, b) => b[1] - a[1])
+      .map(([catId, total], index) => {
+        const cat = DEFAULT_CATEGORIES.find((c) => c.id === catId);
+        return { catId, total, cat, highlighted: index === 0 };
+      });
+  }, [transactions, activeTab]);
+
+
   const cardWidth = SCREEN_WIDTH - 80;
   const cardHeight = cardWidth / 1.586;
 
   return (
-    <View style={styles.root}>
-      <View style={styles.safe}>
-        {/* Content - flex fills remaining space */}
-        <View style={styles.content}>
-          {/* Greeting */}
-          <Text style={styles.greeting}>Hey, {firstName}</Text>
-          <Text style={styles.greetingSub}>Add your yesterday's expense</Text>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <ScrollView style={[styles.safe, { backgroundColor: colors.background }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Greeting */}
+        <Text style={[styles.greeting, { color: colors.text }]}>Hey, {firstName}</Text>
+        <Text style={[styles.greetingSub, { color: colors.textSecondary }]}>Add your yesterday's expense</Text>
 
-          {/* Card */}
-          <View style={styles.cardWrapper}>
-            <LinearGradient
-              colors={['#D4A574', '#A8D4B8', '#6ECFB5']}
-              start={{ x: 0.0, y: 0.0 }}
-              end={{ x: 1.0, y: 1.0 }}
-              style={[styles.card, { width: cardWidth, height: cardHeight }]}
-            >
-              <View style={styles.cardTop}>
-                <Text style={styles.cardBankName}>ADRBank</Text>
-                <View style={styles.cardLogoCircle}>
-                  <LogoIcon size={20} color="#FFFFFF" />
-                </View>
+        {/* Card */}
+        <View style={styles.cardWrapper}>
+          <LinearGradient
+            colors={['#FED4B4', '#3BB9A1']}
+            start={{ x: 0.0, y: 0.0 }}
+            end={{ x: 1.0, y: 1.0 }}
+            style={[styles.card, { width: cardWidth, height: cardHeight }]}
+          >
+            <View style={styles.cardTop}>
+              <Text style={styles.cardBankName}>ADRBank</Text>
+              <View style={styles.cardLogoCircle}>
+                <LogoIcon size={20} color="#FFFFFF" />
               </View>
-              <Text style={styles.cardNumber}>8763 1111 2222 0329</Text>
-              <View style={styles.cardBottom}>
-                <View>
-                  <Text style={styles.cardLabel}>Card Holder Name</Text>
-                  <Text style={styles.cardValue}>ALEX</Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.cardLabel}>Expired Date</Text>
-                  <Text style={styles.cardValue}>10/28</Text>
-                </View>
+            </View>
+            <Text style={styles.cardNumber}>8763 1111 2222 0329</Text>
+            <View style={styles.cardBottom}>
+              <View>
+                <Text style={styles.cardLabel}>Card Holder Name</Text>
+                <Text style={styles.cardValue}>{(user?.name || 'USER').toUpperCase()}</Text>
               </View>
-            </LinearGradient>
-          </View>
-
-          {/* Your expenses */}
-          <Text style={styles.sectionTitle}>Your expenses</Text>
-
-          {/* Toggle */}
-          <View style={styles.toggleWrap}>
-            <Animated.View
-              style={[
-                styles.toggleIndicator,
-                {
-                  left: slideAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '50%'],
-                  }),
-                },
-              ]}
-            />
-            <TouchableOpacity
-              style={styles.toggleBtn}
-              onPress={() => setActiveTab('weekly')}
-              activeOpacity={0.85}
-            >
-              <Text
-                style={[
-                  styles.toggleText,
-                  activeTab === 'weekly' && styles.toggleTextActive,
-                ]}
-              >
-                Weekly
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.toggleBtn}
-              onPress={() => setActiveTab('monthly')}
-              activeOpacity={0.85}
-            >
-              <Text
-                style={[
-                  styles.toggleText,
-                  activeTab === 'monthly' && styles.toggleTextActive,
-                ]}
-              >
-                Monthly
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Expense rows */}
-          <View style={styles.expenseList}>
-            <ExpenseRow
-              title="FOOD"
-              subtitle="Lesser than last week"
-              amount="$1000"
-            />
-            <ExpenseRow
-              title="TRAVEL"
-              subtitle="More than last week"
-              amount="$4000"
-              highlighted
-            />
-          </View>
-
-          <View style={{ flex: 1 }} />
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.cardLabel}>Expired Date</Text>
+                <Text style={styles.cardValue}>10/28</Text>
+              </View>
+            </View>
+          </LinearGradient>
         </View>
-      </View>
+
+        {/* Your expenses */}
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Your expenses</Text>
+
+        {/* Toggle */}
+        <View style={[styles.toggleWrap, { backgroundColor: isDark ? '#1C1C1C' : '#E8E8ED' }]}>
+          <Animated.View
+            style={[
+              styles.toggleIndicator,
+              {
+                backgroundColor: isDark ? '#FFFFFF' : '#FFFFFF',
+                left: slideAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0%', '50%'],
+                }),
+              },
+            ]}
+          />
+          <TouchableOpacity
+            style={styles.toggleBtn}
+            onPress={() => setActiveTab('weekly')}
+            activeOpacity={0.85}
+          >
+            <Text
+              style={[
+                styles.toggleText,
+                { color: isDark ? '#666666' : '#999999' },
+                activeTab === 'weekly' && { color: '#111111', fontWeight: '600' },
+              ]}
+            >
+              Weekly
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.toggleBtn}
+            onPress={() => setActiveTab('monthly')}
+            activeOpacity={0.85}
+          >
+            <Text
+              style={[
+                styles.toggleText,
+                { color: isDark ? '#666666' : '#999999' },
+                activeTab === 'monthly' && { color: '#111111', fontWeight: '600' },
+              ]}
+            >
+              Monthly
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Expense rows */}
+        <View style={styles.expenseList}>
+          {topExpenses.length > 0 ? (
+            topExpenses.map(({ catId, total, cat, highlighted }) => (
+              <ExpenseRow
+                key={catId}
+                title={cat?.name?.toUpperCase() || catId.toUpperCase()}
+                subtitle={highlighted ? 'Top spending' : ''}
+                amount={formatCurrency(total)}
+                highlighted={highlighted}
+                iconName={cat?.icon}
+                isDark={isDark}
+              />
+            ))
+          ) : (
+            <Text style={[styles.emptyText, { color: colors.textTertiary }]}>No expenses yet. Tap + to add one.</Text>
+          )}
+        </View>
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
     </View>
   );
 }
@@ -237,16 +305,13 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
   },
   safe: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
   },
 
   // Content
   content: {
-    flex: 1,
     paddingHorizontal: 18,
     paddingTop: 18,
   },
@@ -255,12 +320,10 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#FFFFFF',
     marginBottom: 4,
   },
   greetingSub: {
     fontSize: 14,
-    color: '#888888',
     marginBottom: 20,
   },
 
@@ -323,14 +386,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFFFFF',
     marginBottom: 12,
   },
 
   // Toggle
   toggleWrap: {
     flexDirection: 'row',
-    backgroundColor: '#1C1C1C',
     borderRadius: 50,
     padding: 4,
     marginBottom: 14,
@@ -341,7 +402,6 @@ const styles = StyleSheet.create({
     top: 4,
     bottom: 4,
     width: '50%',
-    backgroundColor: '#FFFFFF',
     borderRadius: 50,
   },
   toggleBtn: {
@@ -355,16 +415,19 @@ const styles = StyleSheet.create({
   toggleText: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#666666',
-  },
-  toggleTextActive: {
-    color: '#111111',
-    fontWeight: '600',
   },
 
   // Expense List
   expenseList: {
     gap: 10,
+  },
+  expenseRowOuter: {
+    borderRadius: 14,
+    shadowColor: '#FAFAFA',
+    shadowOffset: { width: 1, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 7,
+    elevation: 2,
   },
   expenseRow: {
     borderRadius: 14,
@@ -378,6 +441,30 @@ const styles = StyleSheet.create({
     borderWidth: 0.53,
     borderColor: '#262626',
   },
+  expenseInnerShadowLight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 14,
+    shadowColor: '#FAFAFA',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 7,
+  },
+  expenseInnerShadowDark: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 14,
+    shadowColor: '#000000',
+    shadowOffset: { width: -2, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 7,
+  },
   expenseInner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -387,8 +474,8 @@ const styles = StyleSheet.create({
   expenseIconWrap: {
     width: 42,
     height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    backgroundColor: '#2C2C2E',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 13,
@@ -427,5 +514,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-
+  emptyText: {
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
 });

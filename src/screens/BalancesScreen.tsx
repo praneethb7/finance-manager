@@ -8,7 +8,8 @@ import CreditScoreGauge from '../components/CreditScoreGauge';
 import SpendingBarChart from '../components/SpendingBarChart';
 
 export default function BalancesScreen() {
-  const { colors } = useTheme();
+  const { mode, colors } = useTheme();
+  const isDark = mode === 'dark';
   const { transactions, getMonthlyStats } = useTransactions();
 
   const now = new Date();
@@ -20,8 +21,8 @@ export default function BalancesScreen() {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const s = getMonthlyStats(d.getMonth(), d.getFullYear());
       data.push({
-        value1: s.expenses || (Math.random() * 400 + 100),
-        value2: s.income || (Math.random() * 600 + 200),
+        value1: s.expenses,
+        value2: s.income,
       });
     }
     return data;
@@ -53,16 +54,16 @@ export default function BalancesScreen() {
         </Text>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Available Currencies</Text>
-        <View style={styles.currencyCardOuter}>
+        <View style={[styles.currencyCardOuter, !isDark && { shadowColor: '#000', shadowOpacity: 0.08 }]}>
           <LinearGradient
-            colors={['#262626', '#0A0A0A']}
+            colors={isDark ? ['#262626', '#0A0A0A'] : ['#FFFFFF', '#F5F5F5']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.currencyCard}
+            style={[styles.currencyCard, { borderColor: isDark ? '#262626' : '#E5E5EA' }]}
           >
             {/* Inner shadow overlays */}
-            <View style={styles.innerShadowLight} pointerEvents="none" />
-            <View style={styles.innerShadowDark} pointerEvents="none" />
+            {isDark && <View style={styles.innerShadowLight} pointerEvents="none" />}
+            {isDark && <View style={styles.innerShadowDark} pointerEvents="none" />}
             <View style={styles.currencyLeft}>
               <Text style={styles.flag}>🇨🇦</Text>
               <View>
@@ -74,7 +75,7 @@ export default function BalancesScreen() {
               <TouchableOpacity>
                 <MaterialCommunityIcons name="star-outline" size={20} color={colors.textTertiary} />
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.enableButton, { borderColor: 'rgba(255,255,255,0.15)' }]}>
+              <TouchableOpacity style={[styles.enableButton, { borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#D1D5DB' }]}>
                 <MaterialCommunityIcons name="plus" size={14} color={colors.text} />
                 <Text style={[styles.enableText, { color: colors.text }]}>Enable</Text>
               </TouchableOpacity>
@@ -84,8 +85,8 @@ export default function BalancesScreen() {
 
         <SpendingBarChart
           data={barData}
-          spent={stats.expenses || 350}
-          budget={stats.income || 640}
+          spent={stats.expenses}
+          budget={stats.income}
           title="Current margin: April Spendings"
         />
 
@@ -132,12 +133,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   currencyCardOuter: {
-    marginBottom: 20,
+    marginBottom: 25,
     borderRadius: 14,
     shadowColor: '#FAFAFA',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 7,
+    shadowOffset: { width: 1, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
     elevation: 2,
   },
   currencyCard: {
@@ -148,8 +149,8 @@ const styles = StyleSheet.create({
     borderWidth: 0.53,
     borderColor: '#262626',
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    height: 85,
+    paddingVertical: 8,
+    height: 65,
     overflow: 'hidden',
   },
   innerShadowLight: {
@@ -161,7 +162,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     shadowColor: '#FAFAFA',
     shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.05,
     shadowRadius: 7,
   },
   innerShadowDark: {

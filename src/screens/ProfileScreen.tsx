@@ -13,6 +13,9 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { useTransactions } from '../context/TransactionContext';
+import { formatCurrency } from '../utils/formatters';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -21,14 +24,27 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 type Tab = 'preview' | 'edit';
 
 export default function ProfileScreen() {
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
+  const { mode, colors } = useTheme();
+  const { transactions } = useTransactions();
   const [activeTab, setActiveTab] = useState<Tab>('preview');
+  const isDark = mode === 'dark';
+
+  const totalIncome = transactions
+    .filter((t) => t.type === 'income')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const totalExpenses = transactions
+    .filter((t) => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const balance = totalIncome - totalExpenses;
 
   const [fullName, setFullName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [updateError, setUpdateError] = useState('');
+  const [updateSuccess, setUpdateSuccess] = useState(false);
 
   const slideAnim = useRef(new Animated.Value(0)).current; // 0 = preview, 1 = edit
   const contentFade = useRef(new Animated.Value(1)).current;
@@ -58,17 +74,11 @@ export default function ProfileScreen() {
     });
   };
 
-  // Toggle indicator slides left/right
-  const toggleTranslateX = slideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1], // will be multiplied by half-width via onLayout
-  });
-
   const [toggleWidth, setToggleWidth] = useState(0);
 
   return (
-    <View style={styles.root}>
-      <View style={styles.safe}>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <View style={[styles.safe, { backgroundColor: colors.background }]}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -80,17 +90,17 @@ export default function ProfileScreen() {
           >
             {/* Avatar + Name */}
             <View style={styles.profileHeader}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarLetter}>
+              <View style={[styles.avatar, { backgroundColor: colors.text }]}>
+                <Text style={[styles.avatarLetter, { color: colors.background }]}>
                   {(user?.name?.[0] ?? 'A').toUpperCase()}
                 </Text>
               </View>
-              <Text style={styles.profileName}>{user?.name ?? 'Alex yu'}</Text>
+              <Text style={[styles.profileName, { color: colors.text }]}>{user?.name ?? 'Alex yu'}</Text>
             </View>
 
             {/* Tab Toggle with animated indicator */}
             <View
-              style={styles.toggleWrap}
+              style={[styles.toggleWrap, { backgroundColor: isDark ? '#1C1C1C' : '#E8E8ED' }]}
               onLayout={(e) => setToggleWidth(e.nativeEvent.layout.width)}
             >
               {/* Animated sliding background */}
@@ -98,6 +108,7 @@ export default function ProfileScreen() {
                 style={[
                   styles.toggleIndicator,
                   {
+                    backgroundColor: isDark ? '#FFFFFF' : '#FFFFFF',
                     width: toggleWidth ? (toggleWidth - 8) / 2 : '48%',
                     transform: [
                       {
@@ -116,7 +127,11 @@ export default function ProfileScreen() {
                 activeOpacity={0.85}
               >
                 <Text
-                  style={[styles.toggleText, activeTab === 'preview' && styles.toggleTextActive]}
+                  style={[
+                    styles.toggleText,
+                    { color: isDark ? '#666666' : '#999999' },
+                    activeTab === 'preview' && { color: '#111111', fontWeight: '600' },
+                  ]}
                 >
                   Preview
                 </Text>
@@ -127,7 +142,11 @@ export default function ProfileScreen() {
                 activeOpacity={0.85}
               >
                 <Text
-                  style={[styles.toggleText, activeTab === 'edit' && styles.toggleTextActive]}
+                  style={[
+                    styles.toggleText,
+                    { color: isDark ? '#666666' : '#999999' },
+                    activeTab === 'edit' && { color: '#111111', fontWeight: '600' },
+                  ]}
                 >
                   Edit
                 </Text>
@@ -138,44 +157,44 @@ export default function ProfileScreen() {
             <Animated.View style={{ opacity: contentFade }}>
               {activeTab === 'preview' ? (
                 <View style={styles.previewSection}>
-                  <Text style={styles.previewLabel}>
-                    Total spendings: <Text style={styles.previewValue}>$2000</Text>
+                  <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
+                    Total spendings: <Text style={[styles.previewValue, { color: colors.text }]}>{formatCurrency(totalExpenses)}</Text>
                   </Text>
-                  <Text style={styles.previewLabel}>
-                    Email : <Text style={styles.previewValue}>{user?.email ?? 'alex@gmail.com'}</Text>
+                  <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
+                    Email : <Text style={[styles.previewValue, { color: colors.text }]}>{user?.email ?? 'alex@gmail.com'}</Text>
                   </Text>
-                  <Text style={styles.previewLabel}>
-                    Balance : <Text style={styles.previewValue}>$20000</Text>
+                  <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
+                    Balance : <Text style={[styles.previewValue, { color: balance >= 0 ? '#27AE60' : '#FF2D55' }]}>{formatCurrency(Math.abs(balance))}{balance < 0 ? ' (deficit)' : ''}</Text>
                   </Text>
                 </View>
               ) : (
                 <View style={styles.editSection}>
-                  <Text style={styles.inputLabel}>Full Name</Text>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Full Name</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
                     placeholder="Enter your full name"
-                    placeholderTextColor="#555"
+                    placeholderTextColor={colors.textTertiary}
                     value={fullName}
                     onChangeText={setFullName}
                   />
 
-                  <Text style={styles.inputLabel}>Email</Text>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Email</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
                     placeholder="Enter your email"
-                    placeholderTextColor="#555"
+                    placeholderTextColor={colors.textTertiary}
                     value={email}
                     onChangeText={setEmail}
                     keyboardType="email-address"
                     autoCapitalize="none"
                   />
 
-                  <Text style={styles.inputLabel}>Password</Text>
-                  <View style={styles.passwordWrap}>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Password</Text>
+                  <View style={[styles.passwordWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
                     <TextInput
-                      style={styles.passwordInput}
+                      style={[styles.passwordInput, { color: colors.text }]}
                       placeholder="Create a password"
-                      placeholderTextColor="#555"
+                      placeholderTextColor={colors.textTertiary}
                       value={password}
                       onChangeText={setPassword}
                       secureTextEntry={!showPassword}
@@ -187,23 +206,49 @@ export default function ProfileScreen() {
                       <MaterialCommunityIcons
                         name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                         size={22}
-                        color="#888"
+                        color={colors.textSecondary}
                       />
                     </TouchableOpacity>
                   </View>
 
-                  <Text style={styles.inputLabel}>Confirm Password</Text>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Confirm Password</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
                     placeholder="Confirm your password"
-                    placeholderTextColor="#555"
+                    placeholderTextColor={colors.textTertiary}
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                     secureTextEntry
                   />
 
-                  <TouchableOpacity style={styles.updateBtn} activeOpacity={0.85}>
-                    <Text style={styles.updateBtnText}>Update Details</Text>
+                  {updateError ? <Text style={styles.errorText}>{updateError}</Text> : null}
+                  {updateSuccess ? <Text style={styles.successText}>Profile updated!</Text> : null}
+
+                  <TouchableOpacity
+                    style={[styles.updateBtn, { backgroundColor: colors.text }]}
+                    activeOpacity={0.85}
+                    onPress={async () => {
+                      setUpdateError('');
+                      setUpdateSuccess(false);
+                      if (password && password !== confirmPassword) {
+                        setUpdateError('Passwords do not match');
+                        return;
+                      }
+                      if (password && password.length < 6) {
+                        setUpdateError('Password must be at least 6 characters');
+                        return;
+                      }
+                      try {
+                        await updateProfile(fullName, email, password || undefined);
+                        setUpdateSuccess(true);
+                        setPassword('');
+                        setConfirmPassword('');
+                      } catch (err: any) {
+                        setUpdateError(err?.message || 'Update failed');
+                      }
+                    }}
+                  >
+                    <Text style={[styles.updateBtnText, { color: colors.background }]}>Update Details</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -219,11 +264,9 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
   },
   safe: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
   },
 
   // Content
@@ -247,25 +290,21 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarLetter: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#111111',
   },
   profileName: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFFFFF',
   },
 
   // Toggle
   toggleWrap: {
     flexDirection: 'row',
-    backgroundColor: '#1C1C1C',
     borderRadius: 50,
     padding: 4,
     marginBottom: 28,
@@ -277,7 +316,6 @@ const styles = StyleSheet.create({
     left: 4,
     bottom: 4,
     borderRadius: 50,
-    backgroundColor: '#FFFFFF',
   },
   toggleBtn: {
     flex: 1,
@@ -290,11 +328,6 @@ const styles = StyleSheet.create({
   toggleText: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#666666',
-  },
-  toggleTextActive: {
-    color: '#111111',
-    fontWeight: '600',
   },
 
   // Preview
@@ -303,11 +336,9 @@ const styles = StyleSheet.create({
   },
   previewLabel: {
     fontSize: 16,
-    color: '#999999',
   },
   previewValue: {
     fontWeight: '700',
-    color: '#FFFFFF',
   },
 
   // Edit
@@ -317,40 +348,32 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFFFFF',
     marginBottom: 4,
     marginTop: 10,
   },
   input: {
-    backgroundColor: '#1A1A1A',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#FFFFFF',
   },
   passwordWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A1A1A',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
   },
   passwordInput: {
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#FFFFFF',
   },
   eyeBtn: {
     paddingHorizontal: 14,
   },
   updateBtn: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: 'center',
@@ -360,7 +383,17 @@ const styles = StyleSheet.create({
   updateBtnText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#111111',
   },
-
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 13,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  successText: {
+    color: '#27AE60',
+    fontSize: 13,
+    marginTop: 8,
+    textAlign: 'center',
+  },
 });
