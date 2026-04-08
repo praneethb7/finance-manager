@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
-  Platform,
   Animated,
   ScrollView,
 } from 'react-native';
@@ -15,6 +14,7 @@ import Svg, { Path, G, Defs, ClipPath, Rect } from 'react-native-svg';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTransactions } from '../context/TransactionContext';
+import { useSearch } from '../context/SearchContext';
 import { DEFAULT_CATEGORIES } from '../constants/categories';
 import { formatCurrency } from '../utils/formatters';
 
@@ -59,6 +59,8 @@ function ExpenseRow({
   highlighted = false,
   iconName,
   isDark,
+  starred,
+  onToggleStar,
 }: {
   title: string;
   subtitle: string;
@@ -66,6 +68,8 @@ function ExpenseRow({
   highlighted?: boolean;
   iconName?: string;
   isDark: boolean;
+  starred: boolean;
+  onToggleStar: () => void;
 }) {
   const inner = (
     <View style={styles.expenseInner}>
@@ -87,12 +91,14 @@ function ExpenseRow({
           {subtitle}
         </Text>
       </View>
-      <MaterialCommunityIcons
-        name="star-outline"
-        size={22}
-        color={isDark ? '#3D3D3D' : '#CCCCCC'}
-        style={styles.starIcon}
-      />
+      <TouchableOpacity onPress={onToggleStar} activeOpacity={0.7}>
+        <MaterialCommunityIcons
+          name={starred ? 'star' : 'star-outline'}
+          size={22}
+          color={starred ? '#FFD700' : isDark ? '#3D3D3D' : '#CCCCCC'}
+          style={styles.starIcon}
+        />
+      </TouchableOpacity>
       <View
         style={[
           styles.amountBadge,
@@ -149,9 +155,20 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { mode, colors } = useTheme();
   const { transactions, getMonthlyStats } = useTransactions();
+  const { searchQuery } = useSearch();
   const [activeTab, setActiveTab] = useState<'weekly' | 'monthly'>('weekly');
+  const [starredTitles, setStarredTitles] = useState<Set<string>>(new Set());
   const slideAnim = useRef(new Animated.Value(0)).current;
   const isDark = mode === 'dark';
+
+  const toggleStar = (title: string) => {
+    setStarredTitles((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      return next;
+    });
+  };
 
   const firstName = user?.name?.split(' ')[0] || 'Alex';
 
@@ -166,29 +183,75 @@ export default function HomeScreen() {
 
   const topExpenses = useMemo(() => {
     const now = new Date();
+    const isWeekly = activeTab === 'weekly';
+
+    // Current period boundaries
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - now.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const cutoff = activeTab === 'weekly' ? startOfWeek : startOfMonth;
+    const currentCutoff = isWeekly ? startOfWeek : startOfMonth;
 
-    const expenseTxns = transactions.filter(
-      (t) => t.type === 'expense' && new Date(t.date) >= cutoff
-    );
+    // Previous period boundaries
+    const prevWeekStart = new Date(startOfWeek);
+    prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevCutoff = isWeekly ? prevWeekStart : prevMonthStart;
+    const prevEnd = currentCutoff;
 
-    const byCategory: Record<string, number> = {};
+    const expenseTxns = transactions.filter((t) => t.type === 'expense');
+
+    // Current period grouped by title
+    const currentByTitle: Record<string, { total: number; categoryId: string }> = {};
     for (const t of expenseTxns) {
-      byCategory[t.categoryId] = (byCategory[t.categoryId] || 0) + t.amount;
+      if (new Date(t.date) >= currentCutoff) {
+        if (!currentByTitle[t.title]) {
+          currentByTitle[t.title] = { total: 0, categoryId: t.categoryId };
+        }
+        currentByTitle[t.title].total += t.amount;
+      }
     }
 
-    return Object.entries(byCategory)
-      .sort((a, b) => b[1] - a[1])
-      .map(([catId, total], index) => {
-        const cat = DEFAULT_CATEGORIES.find((c) => c.id === catId);
-        return { catId, total, cat, highlighted: index === 0 };
-      });
-  }, [transactions, activeTab]);
+    // Previous period grouped by title
+    const prevByTitle: Record<string, number> = {};
+    for (const t of expenseTxns) {
+      const d = new Date(t.date);
+      if (d >= prevCutoff && d < prevEnd) {
+        prevByTitle[t.title] = (prevByTitle[t.title] || 0) + t.amount;
+      }
+    }
 
+    const periodLabel = isWeekly ? 'week' : 'month';
+
+    return Object.entries(currentByTitle)
+      .filter(([title]) =>
+        !searchQuery || title.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      .sort((a, b) => b[1].total - a[1].total)
+      .map(([title, { total, categoryId }]) => {
+        const cat = DEFAULT_CATEGORIES.find((c) => c.id === categoryId);
+        const prevTotal = prevByTitle[title];
+        let subtitle: string;
+        let isMore = false;
+        if (prevTotal == null) {
+          subtitle = `New spend this ${periodLabel}`;
+        } else if (total > prevTotal) {
+          subtitle = `More than last ${periodLabel}`;
+          isMore = true;
+        } else if (total < prevTotal) {
+          subtitle = `Less than last ${periodLabel}`;
+        } else {
+          subtitle = `Same as last ${periodLabel}`;
+        }
+        return { title, total, cat, subtitle, isMore };
+      });
+  }, [transactions, activeTab, searchQuery]);
+
+
+  const monthlyStats = useMemo(() => {
+    const now = new Date();
+    return getMonthlyStats(now.getMonth(), now.getFullYear());
+  }, [getMonthlyStats]);
 
   const cardWidth = SCREEN_WIDTH - 80;
   const cardHeight = cardWidth / 1.586;
@@ -280,15 +343,17 @@ export default function HomeScreen() {
         {/* Expense rows */}
         <View style={styles.expenseList}>
           {topExpenses.length > 0 ? (
-            topExpenses.map(({ catId, total, cat, highlighted }) => (
+            topExpenses.map(({ title, total, cat, subtitle, isMore }, index) => (
               <ExpenseRow
-                key={catId}
-                title={cat?.name?.toUpperCase() || catId.toUpperCase()}
-                subtitle={highlighted ? 'Top spending' : ''}
+                key={title}
+                title={title.toUpperCase()}
+                subtitle={subtitle}
                 amount={formatCurrency(total)}
-                highlighted={highlighted}
+                highlighted={isMore || index === 0}
                 iconName={cat?.icon}
                 isDark={isDark}
+                starred={starredTitles.has(title)}
+                onToggleStar={() => toggleStar(title)}
               />
             ))
           ) : (
@@ -518,5 +583,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 20,
+  },
+
+  // Monthly Summary
+  summaryCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  summaryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  summaryDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  summaryLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  summaryValue: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  summaryDivider: {
+    height: StyleSheet.hairlineWidth,
   },
 });

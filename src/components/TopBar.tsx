@@ -6,17 +6,26 @@ import {
   TouchableOpacity,
   Animated,
   TouchableWithoutFeedback,
+  TextInput,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useSearch } from '../context/SearchContext';
 
-export default function TopBar() {
+interface TopBarProps {
+  showSearch?: boolean;
+}
+
+export default function TopBar({ showSearch = true }: TopBarProps) {
   const { mode, colors, toggleTheme } = useTheme();
   const { signOut } = useAuth();
+  const { searchQuery, setSearchQuery } = useSearch();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const searchInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     Animated.parallel([
@@ -55,9 +64,27 @@ export default function TopBar() {
           <Text style={[styles.appName, { color: colors.text }]}>PayU</Text>
         </TouchableOpacity>
         <View style={styles.topBarRight}>
-          <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
-            <MaterialCommunityIcons name="magnify" size={24} color={colors.text} />
-          </TouchableOpacity>
+          {showSearch && (
+            <TouchableOpacity
+              style={styles.iconBtn}
+              activeOpacity={0.7}
+              onPress={() => {
+                if (searchOpen) {
+                  setSearchOpen(false);
+                  setSearchQuery('');
+                } else {
+                  setSearchOpen(true);
+                  setTimeout(() => searchInputRef.current?.focus(), 100);
+                }
+              }}
+            >
+              <MaterialCommunityIcons
+                name={searchOpen ? 'close' : 'magnify'}
+                size={24}
+                color={colors.text}
+              />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
             <MaterialCommunityIcons name="bell-outline" size={24} color={colors.text} />
             <View style={styles.notifBadge}>
@@ -121,6 +148,26 @@ export default function TopBar() {
           </Animated.View>
         )}
       </View>
+      {showSearch && searchOpen && (
+        <View style={[styles.searchBar, { backgroundColor: isDark ? '#1C1C1E' : '#F2F2F7' }]}>
+          <MaterialCommunityIcons name="magnify" size={20} color={colors.textTertiary} />
+          <TextInput
+            ref={searchInputRef}
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Search transactions..."
+            placeholderTextColor={colors.textTertiary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="close-circle" size={18} color={colors.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </>
   );
 }
@@ -215,5 +262,21 @@ const styles = StyleSheet.create({
   menuDivider: {
     height: StyleSheet.hairlineWidth,
     marginHorizontal: 14,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 18,
+    marginTop: 6,
+    marginBottom: 4,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
   },
 });

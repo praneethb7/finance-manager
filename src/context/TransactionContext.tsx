@@ -9,6 +9,7 @@ export interface Transaction {
   categoryId: string;
   date: string; // ISO string
   note: string;
+  title: string;
   createdAt: string;
 }
 

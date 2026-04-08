@@ -13,6 +13,7 @@ import {
   Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -163,6 +164,9 @@ export default function AddTransactionScreen({ onClose }: Props) {
   const [errors, setErrors] = useState<{ amount?: string; category?: string }>({});
   const slideAnim = useRef(new Animated.Value(0)).current;
 
+  const [title, setTitle] = useState('');
+  const [showTitleModal, setShowTitleModal] = useState(true);
+  const titleInputRef = useRef<TextInput>(null);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
   const categories = DEFAULT_CATEGORIES.filter(
@@ -241,7 +245,28 @@ export default function AddTransactionScreen({ onClose }: Props) {
   };
 
   const handleSubmit = () => {
-    if (!validate()) return;
+    // Check title first — if missing, alert and reopen title modal
+    if (!title.trim()) {
+      Alert.alert('Missing Title', 'Please enter a title for this transaction.', [
+        {
+          text: 'OK',
+          onPress: () => {
+            setShowTitleModal(true);
+            setTimeout(() => titleInputRef.current?.focus(), 300);
+          },
+        },
+      ]);
+      return;
+    }
+
+    if (!validate()) {
+      // Build a list of missing fields for the alert
+      const missing: string[] = [];
+      if (!amount || !validateAmount(amount)) missing.push('Amount');
+      if (!selectedCategory) missing.push('Category');
+      Alert.alert('Missing Fields', `Please fill in: ${missing.join(', ')}`);
+      return;
+    }
 
     addTransaction({
       type,
@@ -249,6 +274,7 @@ export default function AddTransactionScreen({ onClose }: Props) {
       categoryId: selectedCategory,
       date: date.toISOString(),
       note: note.trim(),
+      title: title.trim(),
     });
 
     Alert.alert(
@@ -270,7 +296,7 @@ export default function AddTransactionScreen({ onClose }: Props) {
 
   return (
     <KeyboardAvoidingView
-      style={styles.root}
+      style={[styles.root,  { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {/* Full-screen gradient background */}
@@ -278,7 +304,13 @@ export default function AddTransactionScreen({ onClose }: Props) {
         colors={['#FED4B4', '#3BB9A1']}
         start={{ x: 0, y: 0 }}
         end={{ x: 0.9, y: 0.25 }}
-        style={StyleSheet.absoluteFillObject}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 180, 
+        }}
       />
 
       {/* Header — sits on top of the gradient */}
@@ -481,6 +513,107 @@ export default function AddTransactionScreen({ onClose }: Props) {
           <View style={{ height: 40 }} />
         </ScrollView>
       </View>
+
+      {/* Title Entry Modal */}
+      <Modal
+        visible={showTitleModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTitleModal(false)}
+      >
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+
+      
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() =>{
+               if(title.trim())setShowTitleModal(false)
+               else titleInputRef.current?.focus();
+            }} 
+          />
+
+
+          <View style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 400, // tall enough to always be behind keyboard
+            backgroundColor: colors.background,
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+          }} />
+
+        
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={0}
+          >
+            <View style={{
+              backgroundColor: colors.background,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+            }}>
+              <View style={[styles.modalCard, { backgroundColor: 'transparent' }]}>
+                <View style={[styles.modalHandle, { backgroundColor: isDark ? '#444444' : '#CCCCCC' }]} />
+
+                <View style={styles.modalHeader}>
+                  <TouchableOpacity
+                      onPress={()=>setShowTitleModal(false)} 
+                      style={{ position: 'absolute', left: 0 }}
+                    >
+                      <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
+                    </TouchableOpacity>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>Enter Title</Text>
+                </View>
+
+                <View style={[styles.modalInputWrap, { backgroundColor: isDark ? '#1C1C1E' : '#F2F2F7', borderColor: colors.inputBorder }]}>
+                  <TextInput
+                    ref={titleInputRef}
+                    style={[styles.modalInput, { color: colors.text }]}
+                    placeholder="Title"
+                    placeholderTextColor={colors.textTertiary}
+                    value={title}
+                    onChangeText={setTitle}
+                    autoFocus
+                    returnKeyType="done"
+                    onSubmitEditing={() => {
+                      if (title.trim()) setShowTitleModal(false);
+                    }}
+                  />
+                  <Text style={[styles.modalInputIcon, { color: colors.textTertiary }]}>T</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.modalCategoryBtn, { backgroundColor: isDark ? '#2C2C2E' : '#E5E5EA' }]}
+                  onPress={() => {
+                    if (title.trim()) {
+                      setShowTitleModal(false);
+                      setTimeout(() => setShowCategoryDropdown(true), 200);
+                    } else {
+                      Alert.alert("Please enter a title first");
+                      titleInputRef.current?.focus();
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  {selectedCat ? (
+                    <View style={styles.modalCategorySelected}>
+                      <View style={[styles.categoryIconCircle, { backgroundColor: isDark ? '#3A3A3C' : '#D1D1D6' }]}>
+                        <MaterialCommunityIcons name={selectedCat.icon as any} size={20} color={isDark ? '#FFFFFF' : '#3A3A3C'} />
+                      </View>
+                      <Text style={[styles.modalCategoryText, { color: colors.text }]}>{selectedCat.name}</Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.modalCategoryText, { color: colors.textTertiary }]}>Select Category</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -726,5 +859,76 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     marginTop: 4,
     marginBottom: 4,
+  },
+
+  // Title Modal
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalOverlayBg: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  modalCard: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 30,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 16,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    position: 'relative',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  modalInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 11,
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === 'ios' ? 14 : 10,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  modalInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+    padding: 0,
+  },
+  modalInputIcon: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginLeft: 8,
+  },
+  modalCategoryBtn: {
+    borderRadius: 11,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCategorySelected: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  modalCategoryText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

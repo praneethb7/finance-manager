@@ -5,7 +5,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../context/ThemeContext';
+import { SearchProvider } from '../context/SearchContext';
 import HomeScreen from '../screens/HomeScreen';
+import TransactionsScreen from '../screens/TransactionsScreen';
 import BalancesScreen from '../screens/BalancesScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import AddTransactionScreen from '../screens/AddTransactionScreen';
@@ -88,12 +90,22 @@ const Tab = createBottomTabNavigator();
 export default function BottomTabs() {
   const { colors } = useTheme();
   const [showAddTransaction, setShowAddTransaction] = useState(false);
+  const [activeRoute, setActiveRoute] = useState('Home');
+
+  const showSearch = activeRoute === 'Home' || activeRoute === 'Transactions';
 
   return (
+    <SearchProvider>
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
-      <TopBar />
+      <TopBar showSearch={showSearch} />
       <View style={{ flex: 1 }}>
       <Tab.Navigator
+      screenListeners={{
+        state: (e: any) => {
+          const route = e.data?.state?.routes?.[e.data?.state?.index];
+          if (route?.name) setActiveRoute(route.name);
+        },
+      }}
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
@@ -117,6 +129,15 @@ export default function BottomTabs() {
         component={HomeScreen}
         options={{
           tabBarIcon: ({ color }) => <HomeIcon color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="Transactions"
+        component={TransactionsScreen}
+        options={{
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="swap-horizontal" size={22} color={color} />
+          ),
         }}
       />
       <Tab.Screen
@@ -151,6 +172,7 @@ export default function BottomTabs() {
         <AddTransactionScreen onClose={() => setShowAddTransaction(false)} />
       </Modal>
     </SafeAreaView>
+    </SearchProvider>
   );
 }
 
