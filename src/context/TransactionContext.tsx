@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
+import { CurrencyCode, convertAmount } from './CurrencyContext';
 
 export interface Transaction {
   id: string;
   type: 'income' | 'expense';
   amount: number;
+  currency: CurrencyCode;
   categoryId: string;
   date: string; // ISO string
   note: string;
@@ -18,7 +20,7 @@ interface TransactionContextType {
   addTransaction: (t: Omit<Transaction, 'id' | 'createdAt'>) => void;
   deleteTransaction: (id: string) => void;
   editTransaction: (id: string, t: Partial<Transaction>) => void;
-  getMonthlyStats: (month: number, year: number) => { income: number; expenses: number; balance: number };
+  getMonthlyStats: (month: number, year: number, displayCurrency: CurrencyCode) => { income: number; expenses: number; balance: number };
 }
 
 const TransactionContext = createContext<TransactionContextType>({
@@ -26,7 +28,7 @@ const TransactionContext = createContext<TransactionContextType>({
   addTransaction: () => {},
   deleteTransaction: () => {},
   editTransaction: () => {},
-  getMonthlyStats: () => ({ income: 0, expenses: 0, balance: 0 }),
+  getMonthlyStats: (_m, _y, _c) => ({ income: 0, expenses: 0, balance: 0 }),
 });
 
 export const useTransactions = () => useContext(TransactionContext);
@@ -85,13 +87,13 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, [user?.id]);
 
   const getMonthlyStats = useCallback(
-    (month: number, year: number) => {
+    (month: number, year: number, displayCurrency: CurrencyCode) => {
       const filtered = transactions.filter((t) => {
         const d = new Date(t.date);
         return d.getMonth() === month && d.getFullYear() === year;
       });
-      const income = filtered.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-      const expenses = filtered.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+      const income = filtered.filter((t) => t.type === 'income').reduce((s, t) => s + convertAmount(t.amount, t.currency || displayCurrency, displayCurrency), 0);
+      const expenses = filtered.filter((t) => t.type === 'expense').reduce((s, t) => s + convertAmount(t.amount, t.currency || displayCurrency, displayCurrency), 0);
       return { income, expenses, balance: income - expenses };
     },
     [transactions]

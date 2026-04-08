@@ -23,7 +23,7 @@ import { useTransactions, Transaction } from '../context/TransactionContext';
 import { useSearch } from '../context/SearchContext';
 import { DEFAULT_CATEGORIES } from '../constants/categories';
 import { formatCurrency, getCurrencySymbol } from '../utils/formatters';
-import { useCurrency } from '../context/CurrencyContext';
+import { useCurrency, convertAmount } from '../context/CurrencyContext';
 import EmptyState from '../components/EmptyState';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -195,12 +195,12 @@ export default function TransactionsScreen() {
   const summary = useMemo(() => {
     const expenses = monthTransactions
       .filter((t) => t.type === 'expense')
-      .reduce((s, t) => s + t.amount, 0);
+      .reduce((s, t) => s + convertAmount(t.amount, t.currency || currency, currency), 0);
     const income = monthTransactions
       .filter((t) => t.type === 'income')
-      .reduce((s, t) => s + t.amount, 0);
+      .reduce((s, t) => s + convertAmount(t.amount, t.currency || currency, currency), 0);
     return { expenses, income, net: income - expenses };
-  }, [monthTransactions]);
+  }, [monthTransactions, currency]);
 
   // Group by date
   const dateGroups = useMemo(() => {
@@ -220,11 +220,12 @@ export default function TransactionsScreen() {
         };
       }
       groups[key].transactions.push(t);
-      groups[key].dailyTotal += t.type === 'expense' ? -t.amount : t.amount;
+      const converted = convertAmount(t.amount, t.currency || currency, currency);
+      groups[key].dailyTotal += t.type === 'expense' ? -converted : converted;
     }
 
     return Object.values(groups).sort((a, b) => b.dateKey.localeCompare(a.dateKey));
-  }, [monthTransactions]);
+  }, [monthTransactions, currency]);
 
   const getCategoryInfo = useCallback((categoryId: string) => {
     return DEFAULT_CATEGORIES.find((c) => c.id === categoryId);
@@ -238,7 +239,7 @@ export default function TransactionsScreen() {
     const totals: Record<string, number> = {};
     for (const t of monthTransactions) {
       if (t.type !== 'expense') continue;
-      totals[t.categoryId] = (totals[t.categoryId] || 0) + t.amount;
+      totals[t.categoryId] = (totals[t.categoryId] || 0) + convertAmount(t.amount, t.currency || currency, currency);
     }
     const entries = Object.entries(totals)
       .map(([catId, amount]) => {
@@ -252,7 +253,7 @@ export default function TransactionsScreen() {
       })
       .sort((a, b) => b.value - a.value);
     return entries;
-  }, [monthTransactions]);
+  }, [monthTransactions, currency]);
 
   const openFilters = () => {
     setDraftFilters({ ...appliedFilters });
@@ -422,7 +423,7 @@ export default function TransactionsScreen() {
                         ]}
                       >
                         {isExpense ? '▼ ' : '▲ '}
-                        {formatCurrency(t.amount, currency)}
+                        {formatCurrency(convertAmount(t.amount, t.currency || currency, currency), currency)}
                       </Text>
                     </View>
 

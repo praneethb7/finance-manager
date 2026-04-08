@@ -16,20 +16,20 @@ export default function BalancesScreen() {
   const { currency, toggleCurrency } = useCurrency();
 
   const now = new Date();
-  const stats = getMonthlyStats(now.getMonth(), now.getFullYear());
+  const stats = getMonthlyStats(now.getMonth(), now.getFullYear(), currency);
 
   const barData = useMemo(() => {
     const data = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const s = getMonthlyStats(d.getMonth(), d.getFullYear());
+      const s = getMonthlyStats(d.getMonth(), d.getFullYear(), currency);
       data.push({
         value1: s.expenses,
         value2: s.income,
       });
     }
     return data;
-  }, [transactions]);
+  }, [transactions, currency]);
 
   const creditScore = useMemo(() => {
     if (stats.income === 0 && stats.expenses === 0) return 660;

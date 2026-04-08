@@ -14,6 +14,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
   Modal,
+  BackHandler,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -30,8 +31,8 @@ const PICKER_VISIBLE_ITEMS = 5;
 const PICKER_HEIGHT = PICKER_ITEM_HEIGHT * PICKER_VISIBLE_ITEMS;
 const MONTH_NAMES_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const MONTH_REPEAT = 100;
-const DAY_REPEAT = 100;
+const MONTH_REPEAT = 12;
+const DAY_REPEAT = 12;
 
 const MONTH_DATA = Array.from({ length: 12 * MONTH_REPEAT }, (_, i) => i);
 const MONTH_MID_START = Math.floor(MONTH_REPEAT / 2) * 12;
@@ -137,8 +138,9 @@ function DrumColumn({
           paddingTop: padItems * PICKER_ITEM_HEIGHT,
           paddingBottom: padItems * PICKER_ITEM_HEIGHT,
         }}
+        nestedScrollEnabled
       >
-        {data.map((item, i) => {
+        {data.map((_, i) => {
           const disabled = isItemDisabled ? isItemDisabled(i) : false;
           return (
             <View key={i} style={[styles.drumItem, { height: PICKER_ITEM_HEIGHT }]}>
@@ -199,9 +201,38 @@ export default function AddTransactionScreen({ onClose }: Props) {
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   const [title, setTitle] = useState('');
-  const [showTitleModal, setShowTitleModal] = useState(true);
+  const [showTitleModal, setShowTitleModal] = useState(false);
   const titleInputRef = useRef<TextInput>(null);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [toggleWidth, setToggleWidth] = useState(SCREEN_WIDTH - 40);
+
+  // Defer modal open so Android renders it properly
+  useEffect(() => {
+    const t = setTimeout(() => setShowTitleModal(true), 100);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Android hardware back button
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const handler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (showTitleModal) {
+        if (title.trim()) {
+          setShowTitleModal(false);
+        } else {
+          onClose();
+        }
+        return true;
+      }
+      if (showCategoryDropdown) {
+        setShowCategoryDropdown(false);
+        return true;
+      }
+      onClose();
+      return true;
+    });
+    return () => handler.remove();
+  }, [showTitleModal, showCategoryDropdown, title, onClose]);
 
   const categories = DEFAULT_CATEGORIES.filter(
     (c) => c.type === type || c.type === 'both'
@@ -305,6 +336,7 @@ export default function AddTransactionScreen({ onClose }: Props) {
     addTransaction({
       type,
       amount: parseFloat(amount),
+      currency,
       categoryId: selectedCategory,
       date: date.toISOString(),
       note: note.trim(),
@@ -335,6 +367,7 @@ export default function AddTransactionScreen({ onClose }: Props) {
     >
       {/* Full-screen gradient background */}
       <LinearGradient
+        pointerEvents="none"
         colors={['#FED4B4', '#3BB9A1']}
         start={{ x: 0, y: 0 }}
         end={{ x: 0.9, y: 0.25 }}
@@ -367,16 +400,18 @@ export default function AddTransactionScreen({ onClose }: Props) {
           keyboardShouldPersistTaps="handled"
         >
           {/* Type Toggle */}
-          <View style={[styles.toggleWrap, { backgroundColor: isDark ? '#1C1C1C' : '#E8E8ED' }]}>
+          <View style={[styles.toggleWrap, { backgroundColor: isDark ? '#1C1C1C' : '#E8E8ED' }]} onLayout={(e) => { setToggleWidth(e.nativeEvent.layout.width); }}>
             <Animated.View
               style={[
                 styles.toggleIndicator,
                 {
                   backgroundColor: '#FFFFFF',
-                  left: slideAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '50%'],
-                  }),
+                  transform: [{
+                    translateX: slideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, toggleWidth / 2],
+                    }),
+                  }],
                 },
               ]}
             />
@@ -553,7 +588,11 @@ export default function AddTransactionScreen({ onClose }: Props) {
         visible={showTitleModal}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowTitleModal(false)}
+        statusBarTranslucent
+        onRequestClose={() => {
+          if (title.trim()) setShowTitleModal(false);
+          else onClose();
+        }}
       >
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
 
@@ -709,6 +748,7 @@ const styles = StyleSheet.create({
   },
   toggleIndicator: {
     position: 'absolute',
+    left: 0,
     top: 4,
     bottom: 4,
     width: '50%',

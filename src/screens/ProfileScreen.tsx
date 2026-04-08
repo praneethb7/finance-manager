@@ -17,7 +17,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTransactions } from '../context/TransactionContext';
 import { formatCurrency } from '../utils/formatters';
-import { useCurrency } from '../context/CurrencyContext';
+import { useCurrency, convertAmount } from '../context/CurrencyContext';
 import EmptyState from '../components/EmptyState';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -36,10 +36,10 @@ export default function ProfileScreen() {
 
   const totalIncome = transactions
     .filter((t) => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + convertAmount(t.amount, t.currency || currency, currency), 0);
   const totalExpenses = transactions
     .filter((t) => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + convertAmount(t.amount, t.currency || currency, currency), 0);
   const balance = totalIncome - totalExpenses;
 
   const [fullName, setFullName] = useState(user?.name ?? '');

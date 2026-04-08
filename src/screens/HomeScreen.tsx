@@ -17,7 +17,7 @@ import { useTransactions } from '../context/TransactionContext';
 import { useSearch } from '../context/SearchContext';
 import { DEFAULT_CATEGORIES } from '../constants/categories';
 import { formatCurrency } from '../utils/formatters';
-import { useCurrency } from '../context/CurrencyContext';
+import { useCurrency, convertAmount } from '../context/CurrencyContext';
 import EmptyState from '../components/EmptyState';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -211,7 +211,7 @@ export default function HomeScreen() {
         if (!currentByTitle[t.title]) {
           currentByTitle[t.title] = { total: 0, categoryId: t.categoryId };
         }
-        currentByTitle[t.title].total += t.amount;
+        currentByTitle[t.title].total += convertAmount(t.amount, t.currency || currency, currency);
       }
     }
 
@@ -220,7 +220,7 @@ export default function HomeScreen() {
     for (const t of expenseTxns) {
       const d = new Date(t.date);
       if (d >= prevCutoff && d < prevEnd) {
-        prevByTitle[t.title] = (prevByTitle[t.title] || 0) + t.amount;
+        prevByTitle[t.title] = (prevByTitle[t.title] || 0) + convertAmount(t.amount, t.currency || currency, currency);
       }
     }
 
@@ -248,13 +248,13 @@ export default function HomeScreen() {
         }
         return { title, total, cat, subtitle, isMore };
       });
-  }, [transactions, activeTab, searchQuery]);
+  }, [transactions, activeTab, searchQuery, currency]);
 
 
   const monthlyStats = useMemo(() => {
     const now = new Date();
-    return getMonthlyStats(now.getMonth(), now.getFullYear());
-  }, [getMonthlyStats]);
+    return getMonthlyStats(now.getMonth(), now.getFullYear(), currency);
+  }, [getMonthlyStats, currency]);
 
   const cardWidth = SCREEN_WIDTH - 80;
   const cardHeight = cardWidth / 1.586;
