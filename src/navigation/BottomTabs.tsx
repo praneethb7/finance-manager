@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, Platform, TouchableOpacity, Modal } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, StyleSheet, Platform, TouchableOpacity, Modal, PanResponder } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -92,19 +92,48 @@ export default function BottomTabs() {
   const [showAddTransaction, setShowAddTransaction] = useState(false);
   const [activeRoute, setActiveRoute] = useState('Home');
 
+  const TAB_ORDER = ['Home', 'Transactions', 'Balances', 'Profile'] as const;
+  const activeRouteRef = useRef(activeRoute);
+  activeRouteRef.current = activeRoute;
+  const navigationRef = useRef<any>(null);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 30 && Math.abs(gestureState.dy) < 40;
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (Math.abs(gestureState.dx) < 50) return;
+        const currentIndex = TAB_ORDER.indexOf(activeRouteRef.current as any);
+        if (gestureState.dx < 0 && currentIndex < TAB_ORDER.length - 1) {
+          const next = TAB_ORDER[currentIndex + 1];
+          setActiveRoute(next);
+          navigationRef.current?.navigate(next as any);
+        } else if (gestureState.dx > 0 && currentIndex > 0) {
+          const prev = TAB_ORDER[currentIndex - 1];
+          setActiveRoute(prev);
+          navigationRef.current?.navigate(prev as any);
+        }
+      },
+    })
+  ).current;
+
   const showSearch = activeRoute === 'Home' || activeRoute === 'Transactions';
 
   return (
     <SearchProvider>
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
       <TopBar showSearch={showSearch} />
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }} {...panResponder.panHandlers}>
       <Tab.Navigator
-      screenListeners={{
-        state: (e: any) => {
-          const route = e.data?.state?.routes?.[e.data?.state?.index];
-          if (route?.name) setActiveRoute(route.name);
-        },
+      screenListeners={({ navigation }: any) => {
+        if (!navigationRef.current) navigationRef.current = navigation;
+        return {
+          state: (e: any) => {
+            const route = e.data?.state?.routes?.[e.data?.state?.index];
+            if (route?.name) setActiveRoute(route.name);
+          },
+        };
       }}
       screenOptions={{
         headerShown: false,

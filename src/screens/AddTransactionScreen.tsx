@@ -19,8 +19,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTransactions } from '../context/TransactionContext';
 import { useTheme } from '../context/ThemeContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { DEFAULT_CATEGORIES } from '../constants/categories';
 import { validateAmount } from '../utils/validators';
+import { getCurrencySymbol } from '../utils/formatters';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PICKER_ITEM_HEIGHT = 40;
@@ -107,8 +109,13 @@ function DrumColumn({
     isUserScrolling.current = true;
   }, []);
 
+  const bgColor = isDark ? '#1C1C1E' : '#F2F2F7';
+  const fadeColors = isDark
+    ? ['#1C1C1E', 'rgba(28,28,30,0)'] as const
+    : ['#F2F2F7', 'rgba(242,242,247,0)'] as const;
+
   return (
-    <View style={[{ width: columnWidth, height: PICKER_HEIGHT, overflow: 'hidden' }]}>
+    <View style={[{ width: columnWidth, height: PICKER_HEIGHT, overflow: 'hidden', backgroundColor: bgColor }]}>
       <View pointerEvents="none" style={[styles.drumHighlight, {
         top: padItems * PICKER_ITEM_HEIGHT,
         height: PICKER_ITEM_HEIGHT,
@@ -137,8 +144,8 @@ function DrumColumn({
             <View key={i} style={[styles.drumItem, { height: PICKER_ITEM_HEIGHT }]}>
               <Text style={[
                 styles.drumItemText,
-                { color: isDark ? '#666' : '#999' },
-                i === selectedIndex && { color: isDark ? '#FFFFFF' : '#111111', fontWeight: '600', fontSize: 20 },
+                { color: isDark ? '#555' : '#AAAAAA' },
+                i === selectedIndex && { color: isDark ? '#FFFFFF' : '#000000', fontWeight: '700', fontSize: 21 },
                 disabled && { color: isDark ? '#333' : '#CCC' },
               ]}>
                 {renderLabel(i)}
@@ -147,6 +154,32 @@ function DrumColumn({
           );
         })}
       </ScrollView>
+      {/* Top fade gradient */}
+      <LinearGradient
+        colors={[fadeColors[0], fadeColors[1]]}
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: PICKER_ITEM_HEIGHT * 1.5,
+          zIndex: 2,
+        }}
+      />
+      {/* Bottom fade gradient */}
+      <LinearGradient
+        colors={[fadeColors[1], fadeColors[0]]}
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: PICKER_ITEM_HEIGHT * 1.5,
+          zIndex: 2,
+        }}
+      />
     </View>
   );
 }
@@ -155,6 +188,7 @@ function DrumColumn({
 export default function AddTransactionScreen({ onClose }: Props) {
   const { addTransaction } = useTransactions();
   const { mode, colors } = useTheme();
+  const { currency } = useCurrency();
   const isDark = mode === 'dark';
   const [type, setType] = useState<'expense' | 'income'>('expense');
   const [amount, setAmount] = useState('');
@@ -279,7 +313,7 @@ export default function AddTransactionScreen({ onClose }: Props) {
 
     Alert.alert(
       type === 'income' ? 'Income Added' : 'Expense Added',
-      `₹${parseFloat(amount).toLocaleString('en-IN')} recorded successfully`,
+      `${getCurrencySymbol(currency)}${parseFloat(amount).toLocaleString(currency === 'INR' ? 'en-IN' : 'en-CA')} recorded successfully`,
       [{ text: 'OK', onPress: onClose }]
     );
   };
@@ -370,7 +404,7 @@ export default function AddTransactionScreen({ onClose }: Props) {
           <View style={styles.amountSection}>
             <Text style={[styles.amountLabel, { color: colors.textSecondary }]}>Amount</Text>
             <View style={[styles.amountInputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
-              <Text style={[styles.currencySymbol, { color: colors.text }]}>₹</Text>
+              <Text style={[styles.currencySymbol, { color: colors.text }]}>{getCurrencySymbol(currency)}</Text>
               <TextInput
                 style={[styles.amountInput, { color: colors.text }]}
                 placeholder="0.00"

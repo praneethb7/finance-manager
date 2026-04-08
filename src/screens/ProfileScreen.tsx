@@ -10,12 +10,15 @@ import {
   Platform,
   Animated,
   UIManager,
+  Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTransactions } from '../context/TransactionContext';
 import { formatCurrency } from '../utils/formatters';
+import { useCurrency } from '../context/CurrencyContext';
+import EmptyState from '../components/EmptyState';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -24,9 +27,10 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 type Tab = 'preview' | 'edit';
 
 export default function ProfileScreen() {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, signOut } = useAuth();
   const { mode, colors } = useTheme();
   const { transactions } = useTransactions();
+  const { currency } = useCurrency();
   const [activeTab, setActiveTab] = useState<Tab>('preview');
   const isDark = mode === 'dark';
 
@@ -156,17 +160,26 @@ export default function ProfileScreen() {
             {/* Tab content with fade */}
             <Animated.View style={{ opacity: contentFade }}>
               {activeTab === 'preview' ? (
-                <View style={styles.previewSection}>
-                  <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
-                    Total spendings: <Text style={[styles.previewValue, { color: colors.text }]}>{formatCurrency(totalExpenses)}</Text>
-                  </Text>
-                  <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
-                    Email : <Text style={[styles.previewValue, { color: colors.text }]}>{user?.email ?? 'alex@gmail.com'}</Text>
-                  </Text>
-                  <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
-                    Balance : <Text style={[styles.previewValue, { color: balance >= 0 ? '#27AE60' : '#FF2D55' }]}>{formatCurrency(Math.abs(balance))}{balance < 0 ? ' (deficit)' : ''}</Text>
-                  </Text>
-                </View>
+                transactions.length === 0 ? (
+                  <EmptyState
+                    icon="account-outline"
+                    title="Your summary is empty"
+                    subtitle="Add some transactions to see your spending summary and balance here."
+                    accentIcon="cash-plus"
+                  />
+                ) : (
+                  <View style={styles.previewSection}>
+                    <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
+                      Total spendings: <Text style={[styles.previewValue, { color: colors.text }]}>{formatCurrency(totalExpenses, currency)}</Text>
+                    </Text>
+                    <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
+                      Email : <Text style={[styles.previewValue, { color: colors.text }]}>{user?.email ?? 'alex@gmail.com'}</Text>
+                    </Text>
+                    <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
+                      Balance : <Text style={[styles.previewValue, { color: balance >= 0 ? '#27AE60' : '#FF2D55' }]}>{formatCurrency(Math.abs(balance), currency)}{balance < 0 ? ' (deficit)' : ''}</Text>
+                    </Text>
+                  </View>
+                )
               ) : (
                 <View style={styles.editSection}>
                   <Text style={[styles.inputLabel, { color: colors.text }]}>Full Name</Text>
@@ -253,6 +266,21 @@ export default function ProfileScreen() {
                 </View>
               )}
             </Animated.View>
+
+            {/* Log Out Button */}
+            <TouchableOpacity
+              style={styles.logoutBtn}
+              activeOpacity={0.7}
+              onPress={() => {
+                Alert.alert('Log Out', 'Are you sure you want to log out?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Log Out', style: 'destructive', onPress: signOut },
+                ]);
+              }}
+            >
+              <MaterialCommunityIcons name="exit-to-app" size={20} color="#E53935" />
+              <Text style={styles.logoutBtnText}>Log Out</Text>
+            </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
 
@@ -306,7 +334,7 @@ const styles = StyleSheet.create({
   toggleWrap: {
     flexDirection: 'row',
     borderRadius: 50,
-    padding: 4,
+    padding: 2,
     marginBottom: 28,
     position: 'relative',
   },
@@ -319,7 +347,7 @@ const styles = StyleSheet.create({
   },
   toggleBtn: {
     flex: 1,
-    paddingVertical: 7,
+    paddingVertical: 5,
     borderRadius: 50,
     alignItems: 'center',
     justifyContent: 'center',
@@ -395,5 +423,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 8,
     textAlign: 'center',
+  },
+
+  // Logout
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 40,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(229, 57, 53, 0.4)',
+    backgroundColor: 'transparent',
+  },
+  logoutBtnText: {
+    color: '#E53935',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

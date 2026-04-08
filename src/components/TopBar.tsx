@@ -23,6 +23,9 @@ export default function TopBar({ showSearch = true }: TopBarProps) {
   const { searchQuery, setSearchQuery } = useSearch();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifFade = useRef(new Animated.Value(0)).current;
+  const notifScale = useRef(new Animated.Value(0.9)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const searchInputRef = useRef<TextInput>(null);
@@ -43,12 +46,28 @@ export default function TopBar({ showSearch = true }: TopBarProps) {
     ]).start();
   }, [menuOpen]);
 
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(notifFade, {
+        toValue: notifOpen ? 1 : 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(notifScale, {
+        toValue: notifOpen ? 1 : 0.9,
+        useNativeDriver: true,
+        friction: 8,
+        tension: 100,
+      }),
+    ]).start();
+  }, [notifOpen]);
+
   const isDark = mode === 'dark';
 
   return (
     <>
-      {menuOpen && (
-        <TouchableWithoutFeedback onPress={() => setMenuOpen(false)}>
+      {(menuOpen || notifOpen) && (
+        <TouchableWithoutFeedback onPress={() => { setMenuOpen(false); setNotifOpen(false); }}>
           <View style={styles.overlay} />
         </TouchableWithoutFeedback>
       )}
@@ -85,7 +104,14 @@ export default function TopBar({ showSearch = true }: TopBarProps) {
               />
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            activeOpacity={0.7}
+            onPress={() => {
+              setNotifOpen(!notifOpen);
+              setMenuOpen(false);
+            }}
+          >
             <MaterialCommunityIcons name="bell-outline" size={24} color={colors.text} />
             <View style={styles.notifBadge}>
               <Text style={styles.notifBadgeText}>2</Text>
@@ -145,6 +171,43 @@ export default function TopBar({ showSearch = true }: TopBarProps) {
                 Log Out
               </Text>
             </TouchableOpacity>
+          </Animated.View>
+        )}
+
+        {/* Notification Dropdown */}
+        {notifOpen && (
+          <Animated.View
+            style={[
+              styles.notifDropdown,
+              {
+                backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
+                borderColor: isDark ? '#333' : '#E0E0E0',
+                opacity: notifFade,
+                transform: [{ scale: notifScale }],
+              },
+            ]}
+          >
+            <Text style={[styles.notifTitle, { color: colors.text }]}>Notifications</Text>
+            <View style={[styles.menuDivider, { backgroundColor: isDark ? '#333' : '#E0E0E0' }]} />
+            <View style={styles.notifItem}>
+              <View style={[styles.notifDot, { backgroundColor: '#007AFF' }]} />
+              <View style={styles.notifContent}>
+                <Text style={[styles.notifText, { color: colors.text }]}>
+                  2 currencies available now — switch between $ and ₹ in the Balances page.
+                </Text>
+                <Text style={[styles.notifTime, { color: colors.textTertiary }]}>Just now</Text>
+              </View>
+            </View>
+            <View style={[styles.menuDivider, { backgroundColor: isDark ? '#333' : '#E0E0E0' }]} />
+            <View style={styles.notifItem}>
+              <View style={[styles.notifDot, { backgroundColor: '#34C759' }]} />
+              <View style={styles.notifContent}>
+                <Text style={[styles.notifText, { color: colors.text }]}>
+                  View your monthly summary and transactions in the Transactions page.
+                </Text>
+                <Text style={[styles.notifTime, { color: colors.textTertiary }]}>Just now</Text>
+              </View>
+            </View>
           </Animated.View>
         )}
       </View>
@@ -278,5 +341,52 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     padding: 0,
+  },
+  notifDropdown: {
+    position: 'absolute',
+    top: 58,
+    right: 18,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    width: 280,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    elevation: 20,
+    zIndex: 101,
+    borderWidth: 0.5,
+  },
+  notifTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    paddingHorizontal: 14,
+    paddingBottom: 8,
+  },
+  notifItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    gap: 10,
+  },
+  notifDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 5,
+  },
+  notifContent: {
+    flex: 1,
+  },
+  notifText: {
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  notifTime: {
+    fontSize: 11,
+    marginTop: 3,
   },
 });

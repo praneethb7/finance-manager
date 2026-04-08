@@ -17,6 +17,8 @@ import { useTransactions } from '../context/TransactionContext';
 import { useSearch } from '../context/SearchContext';
 import { DEFAULT_CATEGORIES } from '../constants/categories';
 import { formatCurrency } from '../utils/formatters';
+import { useCurrency } from '../context/CurrencyContext';
+import EmptyState from '../components/EmptyState';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -156,6 +158,7 @@ export default function HomeScreen() {
   const { mode, colors } = useTheme();
   const { transactions, getMonthlyStats } = useTransactions();
   const { searchQuery } = useSearch();
+  const { currency } = useCurrency();
   const [activeTab, setActiveTab] = useState<'weekly' | 'monthly'>('weekly');
   const [starredTitles, setStarredTitles] = useState<Set<string>>(new Set());
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -348,7 +351,7 @@ export default function HomeScreen() {
                 key={title}
                 title={title.toUpperCase()}
                 subtitle={subtitle}
-                amount={formatCurrency(total)}
+                amount={formatCurrency(total, currency)}
                 highlighted={isMore || index === 0}
                 iconName={cat?.icon}
                 isDark={isDark}
@@ -357,7 +360,12 @@ export default function HomeScreen() {
               />
             ))
           ) : (
-            <Text style={[styles.emptyText, { color: colors.textTertiary }]}>No expenses yet. Tap + to add one.</Text>
+            <EmptyState
+              icon="wallet-outline"
+              title="No expenses yet"
+              subtitle={`Your ${activeTab} spending will show up here. Tap + to add your first expense.`}
+              accentIcon="plus-circle-outline"
+            />
           )}
         </View>
 

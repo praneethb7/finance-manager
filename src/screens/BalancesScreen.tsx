@@ -4,13 +4,16 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { useTransactions } from '../context/TransactionContext';
+import { useCurrency } from '../context/CurrencyContext';
 import CreditScoreGauge from '../components/CreditScoreGauge';
 import SpendingBarChart from '../components/SpendingBarChart';
+import EmptyState from '../components/EmptyState';
 
 export default function BalancesScreen() {
   const { mode, colors } = useTheme();
   const isDark = mode === 'dark';
   const { transactions, getMonthlyStats } = useTransactions();
+  const { currency, toggleCurrency } = useCurrency();
 
   const now = new Date();
   const stats = getMonthlyStats(now.getMonth(), now.getFullYear());
@@ -34,6 +37,12 @@ export default function BalancesScreen() {
     return Math.round(300 + ratio * 550);
   }, [stats]);
 
+  // Show the "other" currency card — the one you can switch TO
+  const isCAD = currency === 'CAD';
+  const cardFlag = isCAD ? '🇮🇳' : '🇨🇦';
+  const cardCode = isCAD ? 'INR' : 'CAD';
+  const cardName = isCAD ? 'Indian Rupee' : 'Canadian Dollar';
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
@@ -54,6 +63,10 @@ export default function BalancesScreen() {
         </Text>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Available Currencies</Text>
+
+        
+
+        {/* Card for the OTHER currency (the one to switch to) */}
         <View style={[styles.currencyCardOuter, !isDark && { shadowColor: '#000', shadowOpacity: 0.08 }]}>
           <LinearGradient
             colors={isDark ? ['#262626', '#0A0A0A'] : ['#FFFFFF', '#F5F5F5']}
@@ -61,34 +74,45 @@ export default function BalancesScreen() {
             end={{ x: 1, y: 1 }}
             style={[styles.currencyCard, { borderColor: isDark ? '#262626' : '#E5E5EA' }]}
           >
-            {/* Inner shadow overlays */}
             {isDark && <View style={styles.innerShadowLight} pointerEvents="none" />}
             {isDark && <View style={styles.innerShadowDark} pointerEvents="none" />}
             <View style={styles.currencyLeft}>
-              <Text style={styles.flag}>🇨🇦</Text>
+              <Text style={styles.flag}>{cardFlag}</Text>
               <View>
-                <Text style={[styles.currencyCode, { color: colors.text }]}>CAD</Text>
-                <Text style={[styles.currencyName, { color: colors.textSecondary }]}>Canadian Dollar</Text>
+                <Text style={[styles.currencyCode, { color: colors.text }]}>{cardCode}</Text>
+                <Text style={[styles.currencyName, { color: colors.textSecondary }]}>{cardName}</Text>
               </View>
             </View>
             <View style={styles.currencyRight}>
               <TouchableOpacity>
                 <MaterialCommunityIcons name="star-outline" size={20} color={colors.textTertiary} />
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.enableButton, { borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#D1D5DB' }]}>
-                <MaterialCommunityIcons name="plus" size={14} color={colors.text} />
+              <TouchableOpacity
+                style={[styles.enableButton, { borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#D1D5DB' }]}
+                onPress={toggleCurrency}
+              >
+                <MaterialCommunityIcons name="swap-horizontal" size={14} color={colors.text} />
                 <Text style={[styles.enableText, { color: colors.text }]}>Enable</Text>
               </TouchableOpacity>
             </View>
           </LinearGradient>
         </View>
 
-        <SpendingBarChart
-          data={barData}
-          spent={stats.expenses}
-          budget={stats.income}
-          title="Current margin: April Spendings"
-        />
+        {transactions.length === 0 ? (
+          <EmptyState
+            icon="chart-bar"
+            title="No spending data yet"
+            subtitle="Start tracking your income and expenses to see your spending trends here."
+            accentIcon="trending-up"
+          />
+        ) : (
+          <SpendingBarChart
+            data={barData}
+            spent={stats.expenses}
+            budget={stats.income}
+            title={`Current margin: ${new Date().toLocaleString('default', { month: 'long' })} Spendings`}
+          />
+        )}
 
         {/* Bottom spacing for FAB */}
         <View style={{ height: 100 }} />
@@ -131,6 +155,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 10,
+  },
+  activeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  activeBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   currencyCardOuter: {
     marginBottom: 25,

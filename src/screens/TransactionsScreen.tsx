@@ -14,13 +14,17 @@ import {
   LayoutAnimation,
   UIManager,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { PieChart } from 'react-native-gifted-charts';
 import { useTheme } from '../context/ThemeContext';
 import { useTransactions, Transaction } from '../context/TransactionContext';
 import { useSearch } from '../context/SearchContext';
 import { DEFAULT_CATEGORIES } from '../constants/categories';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, getCurrencySymbol } from '../utils/formatters';
+import { useCurrency } from '../context/CurrencyContext';
+import EmptyState from '../components/EmptyState';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -74,6 +78,7 @@ export default function TransactionsScreen() {
   const { colors, mode } = useTheme();
   const { transactions, editTransaction, deleteTransaction } = useTransactions();
   const { searchQuery } = useSearch();
+  const { currency } = useCurrency();
   const isDark = mode === 'dark';
 
   // Expanded card state
@@ -228,6 +233,27 @@ export default function TransactionsScreen() {
   const totalCashFlow = summary.net;
   const totalCount = monthTransactions.length;
 
+  // Category breakdown for pie chart (expenses only)
+  const categoryBreakdown = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const t of monthTransactions) {
+      if (t.type !== 'expense') continue;
+      totals[t.categoryId] = (totals[t.categoryId] || 0) + t.amount;
+    }
+    const entries = Object.entries(totals)
+      .map(([catId, amount]) => {
+        const cat = DEFAULT_CATEGORIES.find((c) => c.id === catId);
+        return {
+          value: amount,
+          color: cat?.color || '#8E8E93',
+          label: cat?.name || catId,
+          icon: (cat?.icon || 'cash') as any,
+        };
+      })
+      .sort((a, b) => b.value - a.value);
+    return entries;
+  }, [monthTransactions]);
+
   const openFilters = () => {
     setDraftFilters({ ...appliedFilters });
     setShowFilters(true);
@@ -300,13 +326,13 @@ export default function TransactionsScreen() {
         <View style={styles.summaryItem}>
           <MaterialCommunityIcons name="arrow-down" size={12} color="#E57373" />
           <Text style={[styles.summaryAmount, { color: '#E57373' }]}>
-            {formatCurrency(summary.expenses)}
+            {formatCurrency(summary.expenses, currency)}
           </Text>
         </View>
         <View style={styles.summaryItem}>
           <MaterialCommunityIcons name="arrow-up" size={12} color="#66BB6A" />
           <Text style={[styles.summaryAmount, { color: '#66BB6A' }]}>
-            {formatCurrency(summary.income)}
+            {formatCurrency(summary.income, currency)}
           </Text>
         </View>
         <View style={styles.summaryItem}>
@@ -317,36 +343,21 @@ export default function TransactionsScreen() {
               { color: summary.net >= 0 ? '#66BB6A' : '#E57373' },
             ]}
           >
-            {summary.net >= 0 ? '' : '-'}{formatCurrency(Math.abs(summary.net))}
+            {summary.net >= 0 ? '' : '-'}{formatCurrency(Math.abs(summary.net), currency)}
           </Text>
         </View>
       </View>
 
       {/* Transaction List or Empty State */}
       {monthTransactions.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons
-            name="telescope"
-            size={80}
-            color={isDark ? '#3A3A3C' : '#C7C7CC'}
-          />
-          <View style={styles.emptyIconRow}>
-            <MaterialCommunityIcons
-              name="piggy-bank-outline"
-              size={40}
-              color={isDark ? '#4A4A4C' : '#AEAEB2'}
-              style={{ marginRight: 12 }}
-            />
-            <MaterialCommunityIcons
-              name="cash-multiple"
-              size={36}
-              color={isDark ? '#4A4A4C' : '#AEAEB2'}
-            />
-          </View>
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            No transactions for {MONTH_NAMES[selectedMonth]}.
-          </Text>
-        </View>
+        <EmptyState
+          icon={hasActiveFilters || searchQuery ? 'filter-off-outline' : 'receipt-text-outline'}
+          title={hasActiveFilters || searchQuery ? 'No matching transactions' : `Nothing in ${MONTH_NAMES[selectedMonth]}`}
+          subtitle={hasActiveFilters || searchQuery
+            ? 'Try adjusting your filters or search to find what you\'re looking for.'
+            : `No transactions recorded for ${MONTH_NAMES[selectedMonth]}. Tap + to log your first one.`}
+          accentIcon={hasActiveFilters || searchQuery ? 'magnify' : 'plus-circle-outline'}
+        />
       ) : (
         <ScrollView
           style={styles.listScroll}
@@ -363,7 +374,7 @@ export default function TransactionsScreen() {
                   {group.dateLabel}
                 </Text>
                 <Text style={[styles.dateTotalText, { color: colors.textSecondary }]}>
-                  {group.dailyTotal >= 0 ? '' : '-'}{formatCurrency(Math.abs(group.dailyTotal))}
+                  {group.dailyTotal >= 0 ? '' : '-'}{formatCurrency(Math.abs(group.dailyTotal), currency)}
                 </Text>
               </View>
 
@@ -411,7 +422,7 @@ export default function TransactionsScreen() {
                         ]}
                       >
                         {isExpense ? '▼ ' : '▲ '}
-                        {formatCurrency(t.amount)}
+                        {formatCurrency(t.amount, currency)}
                       </Text>
                     </View>
 
@@ -431,7 +442,7 @@ export default function TransactionsScreen() {
                         </View>
                         <View style={styles.editRow}>
                           <View style={[styles.editInputWrap, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }]}>
-                            <MaterialCommunityIcons name="currency-inr" size={18} color={isDark ? '#666' : '#999'} />
+                            <Text style={{ fontSize: 16, color: isDark ? '#666' : '#999', fontWeight: '600' }}>{getCurrencySymbol(currency)}</Text>
                             <TextInput
                               style={[styles.editInput, { color: isDark ? '#FFFFFF' : '#111111' }]}
                               value={editAmount}
@@ -475,44 +486,61 @@ export default function TransactionsScreen() {
                   </>
                 );
 
+                const renderRightActions = () => (
+                  <TouchableOpacity
+                    style={styles.swipeDeleteBtn}
+                    onPress={() => {
+                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                      deleteTransaction(t.id);
+                      setExpandedId(null);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialCommunityIcons name="delete-outline" size={24} color="#FFFFFF" />
+                    <Text style={styles.swipeDeleteText}>Delete</Text>
+                  </TouchableOpacity>
+                );
+
                 if (isDark) {
                   return (
-                    <TouchableOpacity
-                      key={t.id}
-                      onPress={() => expandCard(t)}
-                      activeOpacity={0.85}
-                    >
-                      <LinearGradient
-                        colors={isExpense ? ['#262626', '#0A0A0A'] : ['#192D29', '#262626', '#0A0A0A']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={[
-                          styles.gradientCard,
-                          { borderWidth: 0.53, borderColor: '#262626' },
-                        ]}
+                    <Swipeable key={t.id} renderRightActions={renderRightActions} overshootRight={false}>
+                      <TouchableOpacity
+                        onPress={() => expandCard(t)}
+                        activeOpacity={0.85}
                       >
-                        {cardContent}
-                      </LinearGradient>
-                    </TouchableOpacity>
+                        <LinearGradient
+                          colors={isExpense ? ['#262626', '#0A0A0A'] : ['#192D29', '#262626', '#0A0A0A']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={[
+                            styles.gradientCard,
+                            { borderWidth: 0.53, borderColor: '#262626' },
+                          ]}
+                        >
+                          {cardContent}
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    </Swipeable>
                   );
                 }
 
                 return (
-                  <TouchableOpacity
-                    key={t.id}
-                    onPress={() => expandCard(t)}
-                    activeOpacity={0.85}
-                    style={[
-                      styles.gradientCard,
-                      {
-                        backgroundColor: '#FFFFFF',
-                        borderWidth: 1,
-                        borderColor: isExpense ? '#E5E5EA' : '#C8E6C9',
-                      },
-                    ]}
-                  >
-                    {cardContent}
-                  </TouchableOpacity>
+                  <Swipeable key={t.id} renderRightActions={renderRightActions} overshootRight={false}>
+                    <TouchableOpacity
+                      onPress={() => expandCard(t)}
+                      activeOpacity={0.85}
+                      style={[
+                        styles.gradientCard,
+                        {
+                          backgroundColor: '#FFFFFF',
+                          borderWidth: 1,
+                          borderColor: isExpense ? '#E5E5EA' : '#C8E6C9',
+                        },
+                      ]}
+                    >
+                      {cardContent}
+                    </TouchableOpacity>
+                  </Swipeable>
                 );
               })}
             </Pressable>
@@ -521,12 +549,62 @@ export default function TransactionsScreen() {
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={[styles.footerCashFlow, { color: colors.textSecondary }]}>
-              Total cash flow: {totalCashFlow >= 0 ? '' : '-'}{formatCurrency(Math.abs(totalCashFlow))}
+              Total cash flow: {totalCashFlow >= 0 ? '' : '-'}{formatCurrency(Math.abs(totalCashFlow), currency)}
             </Text>
             <Text style={[styles.footerCount, { color: colors.textTertiary }]}>
               {totalCount} transaction{totalCount !== 1 ? 's' : ''}
             </Text>
           </View>
+
+          {/* Category Breakdown Donut Chart */}
+          {categoryBreakdown.length > 0 && (
+            <View style={[styles.chartSection, { backgroundColor: isDark ? '#1A1A1A' : '#F0F0F0' }]}>
+              <Text style={[styles.chartTitle, { color: colors.text }]}>
+                Spending by Category
+              </Text>
+              <View style={styles.chartContainer}>
+                <PieChart
+                  data={categoryBreakdown}
+                  donut
+                  radius={90}
+                  innerRadius={80}
+                  innerCircleColor={isDark ? '#1A1A1A' : '#F0F0F0'}
+                  centerLabelComponent={() => (
+                    <View style={styles.chartCenter}>
+                      <Text style={[styles.chartCenterAmount, { color: colors.text }]}>
+                        {formatCurrency(summary.expenses, currency)}
+                      </Text>
+                      <Text style={[styles.chartCenterLabel, { color: colors.textSecondary }]}>
+                        Total
+                      </Text>
+                    </View>
+                  )}
+                />
+              </View>
+              <View style={styles.legendContainer}>
+                {categoryBreakdown.map((item) => {
+                  const pct = summary.expenses > 0 ? ((item.value / summary.expenses) * 100).toFixed(1) : '0';
+                  return (
+                    <View key={item.label} style={styles.legendRow}>
+                      <View style={styles.legendLeft}>
+                        <View style={[styles.legendDot, { backgroundColor: item.color }]} />
+                        <MaterialCommunityIcons name={item.icon} size={16} color={colors.textSecondary} style={{ marginRight: 6 }} />
+                        <Text style={[styles.legendLabel, { color: colors.text }]}>{item.label}</Text>
+                      </View>
+                      <View style={styles.legendRight}>
+                        <Text style={[styles.legendAmount, { color: colors.text }]}>
+                          {formatCurrency(item.value, currency)}
+                        </Text>
+                        <Text style={[styles.legendPct, { color: colors.textTertiary }]}>
+                          {pct}%
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
 
           <View style={{ height: 100 }} />
         </ScrollView>
@@ -959,6 +1037,23 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
 
+  // Swipe to delete
+  swipeDeleteBtn: {
+    backgroundColor: '#E53935',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    borderRadius: 14,
+    marginBottom: 11,
+    marginLeft: 8,
+  },
+  swipeDeleteText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+
   // Footer
   footer: {
     alignItems: 'center',
@@ -1085,5 +1180,71 @@ const styles = StyleSheet.create({
   filterBtnText: {
     fontSize: 18,
     fontWeight: '600',
+  },
+
+  // Category Breakdown Chart
+  chartSection: {
+    marginTop: 8,
+    borderRadius: 10,
+    padding: 18,
+  },
+  chartTitle: {
+    fontSize: 19,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  chartContainer: {
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  chartCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chartCenterAmount: {
+    fontSize: 20,
+    fontWeight: '500',
+  },
+  chartCenterLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  legendContainer: {
+    gap: 10,
+  },
+  legendRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  legendLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+  legendLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  legendRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  legendAmount: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  legendPct: {
+    fontSize: 12,
+    fontWeight: '500',
+    minWidth: 42,
+    textAlign: 'right',
   },
 });

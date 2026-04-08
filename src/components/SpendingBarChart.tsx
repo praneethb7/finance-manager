@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
+import { useCurrency } from '../context/CurrencyContext';
+import { formatCurrency } from '../utils/formatters';
 
 interface BarData {
   value1: number; // gradient bar
@@ -17,6 +19,7 @@ interface Props {
 
 export default function SpendingBarChart({ data, spent, budget, title }: Props) {
   const { mode, colors } = useTheme();
+  const { currency } = useCurrency();
   const isDark = mode === 'dark';
   const chartHeight = 130;
 
@@ -25,11 +28,12 @@ export default function SpendingBarChart({ data, spent, budget, title }: Props) 
   const maxValue = Math.ceil(dataMax / 100) * 100 || 100; // round up to nearest 100
 
   // Dynamic y-axis labels: top, 2/3, 1/3, 0
+  const sym = currency === 'INR' ? '₹' : '$';
   const yLabels = [
-    `₹${maxValue}`,
-    `₹${Math.round((maxValue * 2) / 3)}`,
-    `₹${Math.round(maxValue / 3)}`,
-    '₹0',
+    `${sym}${maxValue}`,
+    `${sym}${Math.round((maxValue * 2) / 3)}`,
+    `${sym}${Math.round(maxValue / 3)}`,
+    `${sym}0`,
   ];
 
   return (
@@ -89,9 +93,9 @@ export default function SpendingBarChart({ data, spent, budget, title }: Props) 
       <View style={styles.footer}>
         <Text style={[styles.footerTitle, { color: isDark ? '#7A7A7A' : '#999999' }]}>{title}</Text>
         <View style={styles.footerValues}>
-          <Text style={[styles.footerAmount, { color: isDark ? '#6B8A7A' : '#4A7A6A' }]}>₹{spent.toFixed(2)}</Text>
+          <Text style={[styles.footerAmount, { color: isDark ? '#6B8A7A' : '#4A7A6A' }]}>{formatCurrency(spent, currency)}</Text>
           <Text style={[styles.footerSlash, { color: isDark ? '#6B8A7A' : '#4A7A6A' }]}> / </Text>
-          <Text style={[styles.footerAmount, { color: isDark ? '#6B8A7A' : '#4A7A6A' }]}>₹{budget.toFixed(2)}</Text>
+          <Text style={[styles.footerAmount, { color: isDark ? '#6B8A7A' : '#4A7A6A' }]}>{formatCurrency(budget, currency)}</Text>
         </View>
       </View>
     </View>
