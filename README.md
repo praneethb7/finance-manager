@@ -71,7 +71,23 @@ A modern, fintech-style Finance Manager mobile application built with **React Na
 
 ## Screenshots
 
+<p align="center">
+  <img src="screenshots/sign-in.png" width="200" alt="Sign In" />
+  <img src="screenshots/sign-up.png" width="200" alt="Sign Up" />
+  <img src="screenshots/home.jpg" width="200" alt="Home" />
+  <img src="screenshots/transactions-list.png" width="200" alt="Transactions List" />
+</p>
 
+<p align="center">
+  <img src="screenshots/transactions-edit.png" width="200" alt="Transaction Inline Edit" />
+  <img src="screenshots/transactions-chart.png" width="200" alt="Spending by Category" />
+  <img src="screenshots/add-transaction.png" width="200" alt="Add Transaction" />
+  <img src="screenshots/balances.png" width="200" alt="Balances" />
+</p>
+
+<p align="center">
+  <img src="screenshots/profile.png" width="200" alt="Profile" />
+</p>
 
 ---
 

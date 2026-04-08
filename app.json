@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "expense-tracker",
+    "name": "Finance Manager",
     "slug": "expense-tracker",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -21,10 +21,16 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.simpliplay.financemanager"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c41314f9-22f2-40a8-ad62-8ae2616f7c68"
+      }
     }
   }
 }
