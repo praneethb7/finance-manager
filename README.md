@@ -4,9 +4,17 @@ A modern, fintech-style Finance Manager mobile application built with **React Na
 
 ---
 
+### Live Link (Android) : 
+https://expo.dev/accounts/simpliplay/projects/expense-tracker/builds/30415bf7-148d-4ac2-a063-ef22bd584b47
+
+<p align="center">
+  <img src="screenshots/QR.png" width="200" alt="Live Link(Android)" />
+
+
 ## Table of Contents
 
 - [PayU - Finance Manager](#payu---finance-manager)
+    - [Live Link (Android) :](#live-link-android-)
   - [Table of Contents](#table-of-contents)
   - [Features](#features)
     - [Core](#core)
@@ -20,7 +28,6 @@ A modern, fintech-style Finance Manager mobile application built with **React Na
     - [Installation](#installation)
     - [Running the App](#running-the-app)
   - [Build \& Deployment](#build--deployment)
-    - [Generate APK (Android)](#generate-apk-android)
     - [Build for iOS](#build-for-ios)
   - [Architecture](#architecture)
     - [State Management](#state-management)
@@ -74,7 +81,7 @@ A modern, fintech-style Finance Manager mobile application built with **React Na
 <p align="center">
   <img src="screenshots/sign-in.png" width="200" alt="Sign In" />
   <img src="screenshots/sign-up.png" width="200" alt="Sign Up" />
-  <img src="screenshots/home.jpg" width="200" alt="Home" />
+  <img src="screenshots/home.png" width="200" alt="Home" />
   <img src="screenshots/transactions-list.png" width="200" alt="Transactions List" />
 </p>
 
@@ -188,9 +195,7 @@ npm run web
 
 ---
 
-## Build & Deployment
-
-### Generate APK (Android)
+## Build & Deployment 
 
 ```bash
 # Install EAS CLI (if not installed)
